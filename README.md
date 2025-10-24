@@ -36,6 +36,12 @@ crypto-lstm-predictor/
 
 ## 🚀 Быстрый старт
 
+### Тест сайта 
+```bash 
+ python3 -m api.web_app_api
+```
+
+
 ### 1. Создание бота
 
 1. Откройте [@BotFather](https://t.me/botfather) в Telegram

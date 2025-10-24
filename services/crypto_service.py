@@ -1,3 +1,5 @@
+import sys
+import os
 import aiohttp
 import numpy as np
 from datetime import datetime, timedelta
