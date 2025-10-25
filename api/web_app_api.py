@@ -57,48 +57,28 @@ def get_crypto_data(crypto_id):
         if age < CACHE_TTL:
             print(f"  💾 Returning cached data (age: {int(age)}s)")
             return jsonify(cached_data)
-        else:
-            print(f"  ⏰ Cache expired (age: {int(age)}s)")
 
     try:
         async def fetch_all():
-            # Добавляем задержку для избежания rate limit
-            await asyncio.sleep(0.5)
+            from config import COINCAP_API, COINCAP_IDS
 
-            connector = aiohttp.TCPConnector(ssl=False)
-            async with aiohttp.ClientSession(connector=connector) as session:
+            coincap_id = COINCAP_IDS.get(crypto_id, crypto_id)
+
+            async with aiohttp.ClientSession() as session:
                 # Current data
-                url1 = f"https://api.coingecko.com/api/v3/coins/{crypto_id}"
-                params1 = {'localization': 'false', 'tickers': 'false', 'community_data': 'false',
-                           'developer_data': 'false'}
+                url1 = f"{COINCAP_API}/assets/{coincap_id}"
+                print(f"  📡 Fetching from CoinCap: {url1}")
 
-                print(f"  📡 Fetching current data from: {url1}")
+                # History (interval: d1 = daily)
+                url2 = f"{COINCAP_API}/assets/{coincap_id}/history?interval=d1"
 
-                # History
-                url2 = f"https://api.coingecko.com/api/v3/coins/{crypto_id}/market_chart"
-                params2 = {'vs_currency': 'usd', 'days': 90, 'interval': 'daily'}
+                async with session.get(url1) as resp1:
+                    print(f"  ✅ Current status: {resp1.status}")
+                    current = await resp1.json() if resp1.status == 200 else None
 
-                print(f"  📡 Fetching history from: {url2}")
-
-                async with session.get(url1, params=params1) as resp1:
-                    print(f"  ✅ Current data status: {resp1.status}")
-                    if resp1.status == 200:
-                        current = await resp1.json()
-                    elif resp1.status == 429:
-                        print(f"  ⚠️  Rate limit hit for current data")
-                        return None, None
-                    else:
-                        current = None
-
-                async with session.get(url2, params=params2) as resp2:
-                    print(f"  ✅ History data status: {resp2.status}")
-                    if resp2.status == 200:
-                        history = await resp2.json()
-                    elif resp2.status == 429:
-                        print(f"  ⚠️  Rate limit hit for history data")
-                        return None, None
-                    else:
-                        history = None
+                async with session.get(url2) as resp2:
+                    print(f"  ✅ History status: {resp2.status}")
+                    history = await resp2.json() if resp2.status == 200 else None
 
                 return current, history
 
@@ -109,36 +89,39 @@ def get_crypto_data(crypto_id):
         finally:
             loop.close()
 
-        print(f"  📊 Current data: {'✅ OK' if current_raw else '❌ None'}")
-        print(f"  📊 History data: {'✅ OK' if history_raw else '❌ None'}")
-
         if not current_raw or not history_raw:
-            print(f"  ❌ Missing data - returning 404")
-            error_msg = 'Rate limit exceeded. Please wait a minute.' if current_raw is None else 'Failed to fetch data'
-            return jsonify({'success': False, 'error': error_msg}), 404
+            print(f"  ❌ Missing data")
+            return jsonify({'success': False, 'error': 'Failed to fetch data'}), 404
 
-        print(f"  🔄 Processing data...")
+        # Обработка данных CoinCap
+        asset = current_raw['data']
+
+        current_price = float(asset['priceUsd'])
+        change_24h = float(asset['changePercent24Hr'])
 
         current_data = {
-            'price': current_raw['market_data']['current_price']['usd'],
-            'change_24h': current_raw['market_data']['price_change_percentage_24h'],
-            'change_7d': current_raw['market_data'].get('price_change_percentage_7d', 0),
-            'change_30d': current_raw['market_data'].get('price_change_percentage_30d', 0),
-            'high_24h': current_raw['market_data']['high_24h']['usd'],
-            'low_24h': current_raw['market_data']['low_24h']['usd'],
-            'market_cap': current_raw['market_data']['market_cap']['usd'],
-            'volume_24h': current_raw['market_data']['total_volume']['usd'],
+            'price': current_price,
+            'change_24h': change_24h,
+            'change_7d': 0,  # CoinCap не предоставляет
+            'change_30d': 0,
+            'high_24h': current_price * 1.05,  # Приблизительно
+            'low_24h': current_price * 0.95,
+            'market_cap': float(asset['marketCapUsd']),
+            'volume_24h': float(asset['volumeUsd24Hr']),
         }
 
-        prices = [p[1] for p in history_raw['prices']]
-        timestamps = [p[0] for p in history_raw['prices']]
+        # История цен
+        history_data = history_raw['data']
+        prices = [float(item['priceUsd']) for item in history_data[-90:]]  # Последние 90 дней
+        timestamps = [item['time'] for item in history_data[-90:]]
 
         history = {
             'prices': prices,
             'timestamps': timestamps,
-            'volumes': [v[1] for v in history_raw['total_volumes']]
+            'volumes': [float(item.get('volume', 0)) for item in history_data[-90:]]
         }
 
+        # Технические индикаторы (тот же код)
         prices_array = np.array(prices)
         deltas = np.diff(prices_array)
         gains = np.where(deltas > 0, deltas, 0)
@@ -175,21 +158,12 @@ def get_crypto_data(crypto_id):
             }
         }
 
-        # Сохраняем в кэш
         cache[crypto_id] = (result, time.time())
-
-        print(f"✅ Success for {crypto_id} (cached)")
+        print(f"✅ Success for {crypto_id}")
         return jsonify(result)
 
-    except KeyError as e:
-        print(f"❌ KeyError: {e}")
-        print(f"   Missing key in CoinGecko response")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': f'Missing data key: {str(e)}'}), 500
     except Exception as e:
         print(f"❌ Error: {e}")
-        print(f"   Error type: {type(e).__name__}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500

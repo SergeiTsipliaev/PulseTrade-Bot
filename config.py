@@ -2,12 +2,21 @@ import os
 
 # API settings
 COINGECKO_API = 'https://api.coingecko.com/api/v3'
+COINCAP_API = 'https://api.coincap.io/v2'
 
 # LSTM settings
 SEQUENCE_LENGTH = 60
 PREDICTION_DAYS = 7
 EPOCHS = 50
 BATCH_SIZE = 32
+
+COINCAP_IDS = {
+    'bitcoin': 'bitcoin',
+    'ethereum': 'ethereum',
+    'binancecoin': 'binance-coin',
+    'solana': 'solana',
+    'ripple': 'xrp'
+}
 
 CRYPTOS = {
     'BTC': {'id': 'bitcoin', 'name': 'Bitcoin'},
