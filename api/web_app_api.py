@@ -33,7 +33,7 @@ def app_js():
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    return jsonify({'status': 'ok'})
+    return jsonify({'status': 'ok. It`s working'})
 
 
 @app.route('/api/cryptos', methods=['GET'])
@@ -207,7 +207,7 @@ def predict_price(crypto_id):
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 4000))
+    port = int(os.environ.get('PORT', 5000))
     print(f"\n{'=' * 50}")
     print(f"🚀 Flask app starting on port {port}")
     print(f"{'=' * 50}")
