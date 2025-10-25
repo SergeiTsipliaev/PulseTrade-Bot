@@ -19,4 +19,4 @@ CRYPTOS = {
 
 # Bot settings (только для бота, не для API)
 BOT_TOKEN = os.getenv('BOT_TOKEN', '7573870990:AAF8ebxWevgeIZAjjjJOlHaWMcOX5dUzbTU')
-WEB_APP_URL = os.getenv('WEB_APP_URL', '')
+WEB_APP_URL = os.getenv('WEB_APP_URL', 'https://pulsetrade-bot.onrender.com/')
