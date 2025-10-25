@@ -6,6 +6,7 @@ import aiohttp
 import asyncio
 import numpy as np
 import time
+import ssl
 from datetime import datetime
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -30,6 +31,17 @@ CRYPTOS = {
     'solana': {'id': 'solana', 'symbol': 'SOL', 'name': 'Solana'},
     'ripple': {'id': 'ripple', 'symbol': 'XRP', 'name': 'Ripple'},
 }
+
+# SSL Context для избежания ошибок сертификатов
+try:
+    import certifi
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
+except ImportError:
+    # Если certifi не установлен, используем дефолтный контекст
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+    print("⚠️  certifi не найден, SSL проверка отключена (не рекомендуется для продакшена)")
 
 # Кэш (опциональный, т.к. лимит высокий)
 cache = {}
@@ -72,7 +84,8 @@ def get_crypto_data(crypto_id):
         async def fetch_binance():
             symbol = BINANCE_SYMBOLS.get(crypto_id, 'BTCUSDT')
 
-            async with aiohttp.ClientSession() as session:
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            async with aiohttp.ClientSession(connector=connector) as session:
                 # 1. Current price + 24h stats
                 url1 = f"{BINANCE_API}/ticker/24hr"
                 params1 = {'symbol': symbol}
@@ -191,7 +204,8 @@ def predict_price(crypto_id):
         async def fetch_history():
             symbol = BINANCE_SYMBOLS.get(crypto_id, 'BTCUSDT')
 
-            async with aiohttp.ClientSession() as session:
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            async with aiohttp.ClientSession(connector=connector) as session:
                 url = f"{BINANCE_API}/klines"
                 params = {
                     'symbol': symbol,
