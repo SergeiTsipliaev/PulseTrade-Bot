@@ -1,1 +1,1 @@
-web: python3 -m api.web_app_api.py
+web: python3 -m api.web_app_api
