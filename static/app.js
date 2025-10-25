@@ -1,5 +1,5 @@
 // API URL - будет использовать тот же домен
-const API_URL = window.location.origin + 'https://pulsetrade-bot.onrender.com/api';
+const API_URL = window.location.origin + '/api';
 
 const CRYPTOS = {
     'bitcoin': { symbol: 'BTC', name: 'Bitcoin', emoji: '₿' },
