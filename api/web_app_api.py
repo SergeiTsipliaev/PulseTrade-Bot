@@ -49,8 +49,17 @@ except ImportError as e:
 
         async def get_currency_price(self, currency_id):
             # Возвращаем тестовые данные
+            prices = {
+                'BTC': 45000.0,
+                'ETH': 3000.0,
+                'BNB': 600.0,
+                'SOL': 100.0,
+                'XRP': 0.5,
+                'ADA': 0.4,
+                'DOGE': 0.1
+            }
             return {
-                'price': 45000.0 if currency_id == 'BTC' else 3000.0,
+                'price': prices.get(currency_id, 100.0),
                 'currency': 'USD',
                 'base': currency_id,
                 'pair': f'{currency_id}-USD'
@@ -59,20 +68,6 @@ except ImportError as e:
 
     db = DatabaseStub()
     coinbase_service = CoinbaseServiceStub()
-
-
-# Проверяем реальную доступность БД
-def check_db_availability():
-    """Проверяем реальную доступность БД"""
-    try:
-        if hasattr(db, 'is_connected'):
-            return db.is_connected()
-        return DB_AVAILABLE
-    except:
-        return False
-
-
-DB_REALLY_AVAILABLE = check_db_availability()
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -87,13 +82,13 @@ CACHE_TTL = 60
 
 # Популярные криптовалюты для fallback
 POPULAR_CRYPTOS = {
-    'BTC': {'symbol': 'BTC', 'name': 'Bitcoin', 'emoji': '₿'},
-    'ETH': {'symbol': 'ETH', 'name': 'Ethereum', 'emoji': 'Ξ'},
-    'BNB': {'symbol': 'BNB', 'name': 'Binance Coin', 'emoji': '🔶'},
-    'SOL': {'symbol': 'SOL', 'name': 'Solana', 'emoji': '◎'},
-    'XRP': {'symbol': 'XRP', 'name': 'Ripple', 'emoji': '✕'},
-    'ADA': {'symbol': 'ADA', 'name': 'Cardano', 'emoji': '₳'},
-    'DOGE': {'symbol': 'DOGE', 'name': 'Dogecoin', 'emoji': '🐕'},
+    'BTC': {'symbol': 'BTC', 'name': 'Bitcoin'},
+    'ETH': {'symbol': 'ETH', 'name': 'Ethereum'},
+    'BNB': {'symbol': 'BNB', 'name': 'Binance Coin'},
+    'SOL': {'symbol': 'SOL', 'name': 'Solana'},
+    'XRP': {'symbol': 'XRP', 'name': 'Ripple'},
+    'ADA': {'symbol': 'ADA', 'name': 'Cardano'},
+    'DOGE': {'symbol': 'DOGE', 'name': 'Dogecoin'},
 }
 
 
@@ -112,7 +107,7 @@ def health_check():
     return jsonify({
         'status': 'ok',
         'api': 'Coinbase API',
-        'database': 'available' if DB_REALLY_AVAILABLE else 'unavailable',
+        'database': 'available' if DB_AVAILABLE else 'unavailable',
         'async': True,
         'timestamp': datetime.now().isoformat()
     })
@@ -129,43 +124,36 @@ def search_cryptocurrencies():
     logger.info(f"🔍 Асинхронный поиск: '{query}'")
 
     async def perform_search():
-        # Сначала ищем в БД (если реально доступна)
-        if DB_REALLY_AVAILABLE:
-            try:
-                db_results = db.search_cryptocurrencies(query)
+        # Сначала ищем в БД (если доступна)
+        if DB_AVAILABLE:
+            db_results = db.search_cryptocurrencies(query)
 
-                if db_results and len(db_results) > 0:
-                    results = [
-                        {
-                            'id': row['coinbase_id'],
-                            'symbol': row['symbol'],
-                            'name': row['name']
-                        }
-                        for row in db_results
-                    ]
-                    logger.info(f"✅ Найдено в БД: {len(results)} результатов")
-                    return {'success': True, 'data': results, 'source': 'database'}
-            except Exception as e:
-                logger.warning(f"⚠️ Ошибка поиска в БД: {e}")
+            if db_results:
+                results = [
+                    {
+                        'id': row['coinbase_id'],
+                        'symbol': row['symbol'],
+                        'name': row['name']
+                    }
+                    for row in db_results
+                ]
+                logger.info(f"✅ Найдено в БД: {len(results)} результатов")
+                return {'success': True, 'data': results, 'source': 'database'}
 
         # Ищем через Coinbase API асинхронно
-        try:
-            api_results = await coinbase_service.search_currencies(query)
+        api_results = await coinbase_service.search_currencies(query)
 
-            results = [
-                {
-                    'id': currency['code'],
-                    'symbol': currency['symbol'],
-                    'name': currency['name']
-                }
-                for currency in api_results
-            ]
+        results = [
+            {
+                'id': currency['code'],
+                'symbol': currency['symbol'],
+                'name': currency['name']
+            }
+            for currency in api_results
+        ]
 
-            logger.info(f"✅ Найдено через API: {len(results)} результатов")
-            return {'success': True, 'data': results, 'source': 'coinbase'}
-        except Exception as e:
-            logger.error(f"❌ Ошибка поиска в API: {e}")
-            return {'success': True, 'data': [], 'source': 'error'}
+        logger.info(f"✅ Найдено через API: {len(results)} результатов")
+        return {'success': True, 'data': results, 'source': 'coinbase'}
 
     try:
         # Запускаем асинхронную функцию
@@ -184,7 +172,7 @@ def search_cryptocurrencies():
 @app.route('/api/cryptos/all', methods=['GET'])
 def get_all_cryptocurrencies():
     try:
-        if DB_REALLY_AVAILABLE:
+        if DB_AVAILABLE:
             cryptocurrencies = db.get_all_cryptocurrencies()
             results = [
                 {
@@ -410,7 +398,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"\n{'=' * 60}")
     print(f"🚀 Crypto Tracker с поиском")
-    print(f"📊 База данных: {'доступна' if DB_REALLY_AVAILABLE else 'недоступна'}")
+    print(f"📊 База данных: {'доступна' if DB_AVAILABLE else 'недоступна'}")
     print(f"🔍 Поиск: Coinbase API")
     print(f"⚡ Асинхронные запросы: aiohttp")
     print(f"🎯 Все endpoint'ы теперь асинхронные!")

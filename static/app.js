@@ -1,11 +1,209 @@
-// Загрузка данных криптовалюты
+// API URL
+const API_URL = window.location.origin + '/api';
+
+// Популярные криптовалюты
+const CRYPTOS = {
+    'BTC': { id: 'BTC', symbol: 'BTC', name: 'Bitcoin', emoji: '₿' },
+    'ETH': { id: 'ETH', symbol: 'ETH', name: 'Ethereum', emoji: 'Ξ' },
+    'BNB': { id: 'BNB', symbol: 'BNB', name: 'Binance Coin', emoji: '🔶' },
+    'SOL': { id: 'SOL', symbol: 'SOL', name: 'Solana', emoji: '◎' },
+    'XRP': { id: 'XRP', symbol: 'XRP', name: 'Ripple', emoji: '✕' },
+    'ADA': { id: 'ADA', symbol: 'ADA', name: 'Cardano', emoji: '₳' },
+    'DOGE': { id: 'DOGE', symbol: 'DOGE', name: 'Dogecoin', emoji: '🐕' }
+};
+
+let selectedCrypto = null;
+let priceChart = null;
+let predictionChart = null;
+let searchTimeout = null;
+
+// Инициализация Telegram WebApp
+const tg = window.Telegram.WebApp;
+tg.expand();
+tg.ready();
+
+// Инициализация
+function init() {
+    renderCryptoGrid();
+    setupEventListeners();
+    setupSearch();
+    console.log("✅ Приложение инициализировано");
+}
+
+// Настройка поиска
+function setupSearch() {
+    const searchInput = document.getElementById('searchInput');
+    const searchResults = document.getElementById('searchResults');
+
+    searchInput.addEventListener('input', function(e) {
+        const query = e.target.value.trim();
+
+        // Очищаем предыдущий таймаут
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+
+        // Скрываем результаты если запрос пустой
+        if (query.length === 0) {
+            searchResults.style.display = 'none';
+            return;
+        }
+
+        // Запускаем поиск с задержкой
+        searchTimeout = setTimeout(() => {
+            performSearch(query);
+        }, 300);
+    });
+
+    // Закрываем результаты при клике вне поиска
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.style.display = 'none';
+        }
+    });
+}
+
+// Поиск криптовалют
+async function performSearch(query) {
+    if (query.length < 1) return;
+
+    const searchResults = document.getElementById('searchResults');
+
+    try {
+        console.log(`🔍 Поиск: ${query}`);
+        const response = await fetch(`${API_URL}/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        if (data.success) {
+            displaySearchResults(data.data);
+        } else {
+            searchResults.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Ошибка поиска:', error);
+        searchResults.style.display = 'none';
+    }
+}
+
+// Отображение результатов поиска
+function displaySearchResults(results) {
+    const searchResults = document.getElementById('searchResults');
+
+    if (results.length === 0) {
+        searchResults.innerHTML = '<div class="search-result-item">Ничего не найдено</div>';
+        searchResults.style.display = 'block';
+        return;
+    }
+
+    searchResults.innerHTML = results.map(crypto => `
+        <div class="search-result-item" onclick="selectCryptoFromSearch('${crypto.id}', '${crypto.symbol}', '${crypto.name}')">
+            <div class="crypto-symbol">${crypto.symbol}</div>
+            <div class="crypto-name">${crypto.name}</div>
+        </div>
+    `).join('');
+
+    searchResults.style.display = 'block';
+}
+
+// Выбор криптовалюты из поиска
+function selectCryptoFromSearch(id, symbol, name) {
+    selectedCrypto = id;
+
+    // Закрываем результаты поиска
+    document.getElementById('searchResults').style.display = 'none';
+    document.getElementById('searchInput').value = '';
+
+    // Показываем данные
+    showLoading('Загрузка данных...');
+    loadCryptoData(id, symbol, name);
+}
+
+// Загрузка всех криптовалют
+async function loadAllCryptocurrencies() {
+    showLoading('Загрузка списка...');
+
+    try {
+        const response = await fetch(`${API_URL}/cryptos/all`);
+        const data = await response.json();
+
+        if (data.success) {
+            displayAllCryptocurrencies(data.data);
+        } else {
+            tg.showAlert('Ошибка загрузки списка');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        tg.showAlert('Ошибка подключения');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Отображение всех криптовалют в модальном окне
+function displayAllCryptocurrencies(cryptos) {
+    const cryptoList = document.getElementById('cryptoList');
+    const modal = document.getElementById('allCryptosModal');
+
+    cryptoList.innerHTML = cryptos.map(crypto => `
+        <div class="crypto-list-item" onclick="selectCryptoFromList('${crypto.id}', '${crypto.symbol}', '${crypto.name}')">
+            <div class="crypto-symbol">${crypto.symbol}</div>
+            <div class="crypto-name">${crypto.name}</div>
+        </div>
+    `).join('');
+
+    modal.classList.add('show');
+}
+
+// Выбор криптовалюты из списка
+function selectCryptoFromList(id, symbol, name) {
+    selectedCrypto = id;
+
+    // Закрываем модальное окно
+    document.getElementById('allCryptosModal').classList.remove('show');
+
+    // Показываем данные
+    showLoading('Загрузка данных...');
+    loadCryptoData(id, symbol, name);
+}
+
+// Отрисовка сетки криптовалют
+function renderCryptoGrid() {
+    const grid = document.getElementById('cryptoGrid');
+    grid.innerHTML = '';
+
+    Object.entries(CRYPTOS).forEach(([id, data]) => {
+        const card = document.createElement('div');
+        card.className = 'crypto-card';
+        card.innerHTML = `
+            <div class="crypto-emoji">${data.emoji}</div>
+            <div class="crypto-symbol-small">${data.symbol}</div>
+        `;
+        card.onclick = () => loadCryptoData(data.id, data.symbol, data.name);
+        grid.appendChild(card);
+    });
+}
+
+// Настройка обработчиков
+function setupEventListeners() {
+    document.getElementById('predictBtn').onclick = makePrediction;
+    document.getElementById('allCryptosBtn').onclick = loadAllCryptocurrencies;
+    document.getElementById('closeModal').onclick = () => {
+        document.getElementById('allCryptosModal').classList.remove('show');
+    };
+}
+
+// ЗАГРУЗКА ДАННЫХ КРИПТОВАЛЮТЫ - ЭТА ФУНКЦИЯ ОТСУТСТВОВАЛА!
 async function loadCryptoData(cryptoId, symbol, name) {
+    console.log(`📊 Загрузка данных для: ${cryptoId}`);
     selectedCrypto = cryptoId;
     showLoading('Загрузка данных...');
 
     try {
         const response = await fetch(`${API_URL}/crypto/${cryptoId}`);
+        console.log(`📡 Ответ API:`, response.status);
+
         const data = await response.json();
+        console.log(`📊 Данные получены:`, data);
 
         if (data.success) {
             displayCryptoData(data.data, symbol, name);
@@ -23,6 +221,8 @@ async function loadCryptoData(cryptoId, symbol, name) {
 
 // Отображение данных криптовалюты
 function displayCryptoData(data, symbol, name) {
+    console.log(`🎯 Отображение данных для: ${symbol}`);
+
     const crypto = CRYPTOS[selectedCrypto] || { symbol: symbol, name: name };
 
     // Цена
@@ -45,6 +245,8 @@ function displayCryptoData(data, symbol, name) {
 
     // Показываем секции
     document.getElementById('indicatorsSection').classList.remove('hidden');
+
+    console.log(`✅ Данные отображены успешно`);
 }
 
 // График цены
@@ -298,11 +500,5 @@ function showError(message) {
     tg.showAlert(message);
 }
 
-// Обновите setupEventListeners
-function setupEventListeners() {
-    document.getElementById('predictBtn').onclick = makePrediction;
-    document.getElementById('allCryptosBtn').onclick = loadAllCryptocurrencies;
-    document.getElementById('closeModal').onclick = () => {
-        document.getElementById('allCryptosModal').classList.remove('show');
-    };
-}
+// Запуск приложения
+init();
