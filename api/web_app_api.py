@@ -3,13 +3,19 @@ from flask_cors import CORS
 import os
 import sys
 import asyncio
+import aiohttp
 import numpy as np
 import time
+import logging
 from datetime import datetime, timedelta
 from services.coinbase_service import coinbase_service
 from models.database import db
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder='../static')
 CORS(app)
@@ -34,7 +40,8 @@ def health_check():
     return jsonify({
         'status': 'ok',
         'api': 'Coinbase + PostgreSQL',
-        'features': ['поиск', 'прогнозы', 'все криптовалюты']
+        'features': ['поиск', 'прогнозы', 'все криптовалюты'],
+        'timestamp': datetime.now().isoformat()
     })
 
 
@@ -46,7 +53,7 @@ def search_cryptocurrencies():
     if not query or len(query) < 1:
         return jsonify({'success': True, 'data': []})
 
-    print(f"🔍 Поиск: '{query}'")
+    logger.info(f"🔍 Поиск: '{query}'")
 
     try:
         # Сначала ищем в БД
@@ -61,6 +68,7 @@ def search_cryptocurrencies():
                 }
                 for row in db_results
             ]
+            logger.info(f"✅ Найдено в БД: {len(results)} результатов")
             return jsonify({'success': True, 'data': results, 'source': 'database'})
 
         # Если в БД нет, ищем через Coinbase API
@@ -82,10 +90,11 @@ def search_cryptocurrencies():
             for currency in api_results
         ]
 
+        logger.info(f"✅ Найдено через API: {len(results)} результатов")
         return jsonify({'success': True, 'data': results, 'source': 'coinbase'})
 
     except Exception as e:
-        print(f"❌ Ошибка поиска: {e}")
+        logger.error(f"❌ Ошибка поиска: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -104,6 +113,7 @@ def get_all_cryptocurrencies():
             for row in cryptocurrencies
         ]
 
+        logger.info(f"📋 Загружено {len(results)} криптовалют из БД")
         return jsonify({
             'success': True,
             'data': results,
@@ -111,27 +121,27 @@ def get_all_cryptocurrencies():
         })
 
     except Exception as e:
-        print(f"❌ Ошибка получения списка: {e}")
+        logger.error(f"❌ Ошибка получения списка: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # 💰 ДАННЫЕ КРИПТОВАЛЮТЫ
 @app.route('/api/crypto/<crypto_id>', methods=['GET'])
 def get_crypto_data(crypto_id):
-    print(f"\n{'=' * 60}")
-    print(f"📊 GET /api/crypto/{crypto_id}")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"📊 GET /api/crypto/{crypto_id}")
+    logger.info(f"{'=' * 60}")
 
     # Проверка кэша
     if crypto_id in cache:
         cached_data, cached_time = cache[crypto_id]
         age = time.time() - cached_time
         if age < CACHE_TTL:
-            print(f"💾 Кэш ({int(age)}с)")
+            logger.info(f"💾 Кэш ({int(age)}с)")
             return jsonify(cached_data)
 
     try:
-        # Получаем текущую цену
+        # Получаем текущую цену асинхронно
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -142,6 +152,7 @@ def get_crypto_data(crypto_id):
             loop.close()
 
         if not price_data:
+            logger.warning(f"⚠️ Не удалось получить данные для {crypto_id}")
             return jsonify({
                 'success': False,
                 'error': f'Не удалось получить данные для {crypto_id}'
@@ -149,13 +160,12 @@ def get_crypto_data(crypto_id):
 
         current_price = price_data['price']
 
-        # Здесь можно добавить получение исторических данных
-        # Для демо используем сгенерированные данные
-        prices = self.generate_sample_data(current_price)
-        timestamps = self.generate_timestamps()
+        # Генерируем демо-данные (можно заменить на реальные исторические данные)
+        prices = generate_sample_data(current_price)
+        timestamps = generate_timestamps()
 
         # Расчет индикаторов
-        indicators = self.calculate_indicators(prices)
+        indicators = calculate_indicators(prices)
 
         result = {
             'success': True,
@@ -166,6 +176,8 @@ def get_crypto_data(crypto_id):
                 'current': {
                     'price': current_price,
                     'currency': price_data['currency'],
+                    'base': price_data['base'],
+                    'pair': price_data.get('pair', 'N/A'),
                     'change_24h': 0,  # Можно получить из Coinbase
                     'volume_24h': 0
                 },
@@ -180,20 +192,20 @@ def get_crypto_data(crypto_id):
         # Кэширование
         cache[crypto_id] = (result, time.time())
 
-        print(f"✅ Успех: {crypto_id} - ${current_price:,.2f}")
-        print(f"{'=' * 60}\n")
+        logger.info(f"✅ Успех: {crypto_id} - ${current_price:,.2f}")
+        logger.info(f"{'=' * 60}\n")
 
         return jsonify(result)
 
     except Exception as e:
-        print(f"❌ Ошибка: {e}")
+        logger.error(f"❌ Ошибка получения данных: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # 🔮 ПРОГНОЗ
 @app.route('/api/predict/<crypto_id>', methods=['POST'])
 def predict_price(crypto_id):
-    print(f"\n🔮 Прогноз для: {crypto_id}")
+    logger.info(f"\n🔮 Прогноз для: {crypto_id}")
 
     try:
         # Получаем текущую цену для прогноза
@@ -212,7 +224,9 @@ def predict_price(crypto_id):
         current_price = price_data['price']
 
         # Простой прогноз (можно заменить на LSTM)
-        predictions = self.simple_prediction(current_price)
+        predictions = simple_prediction(current_price)
+
+        logger.info(f"✅ Прогноз создан для {crypto_id}")
 
         return jsonify({
             'success': True,
@@ -227,17 +241,18 @@ def predict_price(crypto_id):
         })
 
     except Exception as e:
-        print(f"❌ Ошибка прогноза: {e}")
+        logger.error(f"❌ Ошибка прогноза: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # 🛠️ ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
 def generate_sample_data(current_price):
     """Генерация демо-данных"""
+    np.random.seed(42)  # Для воспроизводимости
     prices = [current_price]
     for i in range(89):
         change = np.random.normal(0, 0.02)  # Случайное изменение ±2%
-        new_price = prices[-1] * (1 + change)
+        new_price = max(prices[-1] * (1 + change), 0.01)  # Защита от отрицательных цен
         prices.append(new_price)
     return prices
 
@@ -250,24 +265,47 @@ def generate_timestamps():
 
 def calculate_indicators(prices):
     """Расчет технических индикаторов"""
-    prices_array = np.array(prices)
+    try:
+        prices_array = np.array(prices)
 
-    # RSI
-    deltas = np.diff(prices_array)
-    gains = np.where(deltas > 0, deltas, 0)
-    losses = np.where(deltas < 0, -deltas, 0)
+        # RSI
+        if len(prices_array) > 1:
+            deltas = np.diff(prices_array)
+            gains = np.where(deltas > 0, deltas, 0)
+            losses = np.where(deltas < 0, -deltas, 0)
 
-    avg_gain = np.mean(gains[-14:]) if len(gains) >= 14 else 0
-    avg_loss = np.mean(losses[-14:]) if len(losses) >= 14 else 0
-    rs = avg_gain / avg_loss if avg_loss != 0 else 0
-    rsi = 100 - (100 / (1 + rs))
+            avg_gain = np.mean(gains[-14:]) if len(gains) >= 14 else 0
+            avg_loss = np.mean(losses[-14:]) if len(losses) >= 14 else 0
+            rs = avg_gain / avg_loss if avg_loss != 0 else 0
+            rsi = 100 - (100 / (1 + rs))
+        else:
+            rsi = 50.0
 
-    return {
-        'rsi': float(rsi),
-        'ma_7': float(np.mean(prices_array[-7:])),
-        'ma_25': float(np.mean(prices_array[-25:])),
-        'volatility': float(np.std(np.diff(prices_array) / prices_array[:-1]) * 100)
-    }
+        # Moving Averages
+        ma_7 = float(np.mean(prices_array[-7:])) if len(prices_array) >= 7 else float(prices_array[-1])
+        ma_25 = float(np.mean(prices_array[-25:])) if len(prices_array) >= 25 else ma_7
+
+        # Volatility
+        if len(prices_array) > 1:
+            returns = np.diff(prices_array) / prices_array[:-1]
+            volatility = float(np.std(returns) * 100) if len(returns) > 0 else 0
+        else:
+            volatility = 0
+
+        return {
+            'rsi': float(rsi),
+            'ma_7': ma_7,
+            'ma_25': ma_25,
+            'volatility': volatility
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка расчета индикаторов: {e}")
+        return {
+            'rsi': 50.0,
+            'ma_7': prices[-1] if prices else 0,
+            'ma_25': prices[-1] if prices else 0,
+            'volatility': 0
+        }
 
 
 def simple_prediction(current_price):
@@ -281,5 +319,6 @@ if __name__ == '__main__':
     print(f"🚀 Crypto Tracker с поиском")
     print(f"📊 База данных: PostgreSQL")
     print(f"🔍 Поиск: Coinbase API + локальный кэш")
+    print(f"⚡ Асинхронные запросы: aiohttp")
     print(f"{'=' * 60}")
     app.run(host='0.0.0.0', port=port, debug=False)
