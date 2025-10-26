@@ -8,10 +8,34 @@ import numpy as np
 import time
 import logging
 from datetime import datetime, timedelta
-from services.coinbase_service import coinbase_service
-from models.database import db
 
+# Добавляем корневую директорию в путь для импортов
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+try:
+    from services.coinbase_service import coinbase_service
+    from models.database import db
+
+    DB_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Предупреждение: {e}")
+    print("⚠️ База данных недоступна, используется режим без БД")
+    DB_AVAILABLE = False
+
+
+    # Создаем заглушки для тестирования
+    class DatabaseStub:
+        def search_cryptocurrencies(self, query):
+            return []
+
+        def add_cryptocurrency(self, *args):
+            return False
+
+        def get_all_cryptocurrencies(self):
+            return []
+
+
+    db = DatabaseStub()
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -23,6 +47,17 @@ CORS(app)
 # Кэш для данных
 cache = {}
 CACHE_TTL = 60
+
+# Популярные криптовалюты для fallback
+POPULAR_CRYPTOS = {
+    'BTC': {'symbol': 'BTC', 'name': 'Bitcoin'},
+    'ETH': {'symbol': 'ETH', 'name': 'Ethereum'},
+    'BNB': {'symbol': 'BNB', 'name': 'Binance Coin'},
+    'SOL': {'symbol': 'SOL', 'name': 'Solana'},
+    'XRP': {'symbol': 'XRP', 'name': 'Ripple'},
+    'ADA': {'symbol': 'ADA', 'name': 'Cardano'},
+    'DOGE': {'symbol': 'DOGE', 'name': 'Dogecoin'},
+}
 
 
 @app.route('/')
@@ -39,7 +74,8 @@ def app_js():
 def health_check():
     return jsonify({
         'status': 'ok',
-        'api': 'Coinbase + PostgreSQL',
+        'api': 'Coinbase API',
+        'database': 'available' if DB_AVAILABLE else 'unavailable',
         'features': ['поиск', 'прогнозы', 'все криптовалюты'],
         'timestamp': datetime.now().isoformat()
     })
@@ -56,22 +92,23 @@ def search_cryptocurrencies():
     logger.info(f"🔍 Поиск: '{query}'")
 
     try:
-        # Сначала ищем в БД
-        db_results = db.search_cryptocurrencies(query)
+        # Сначала ищем в БД (если доступна)
+        if DB_AVAILABLE:
+            db_results = db.search_cryptocurrencies(query)
 
-        if db_results:
-            results = [
-                {
-                    'id': row['coinbase_id'],
-                    'symbol': row['symbol'],
-                    'name': row['name']
-                }
-                for row in db_results
-            ]
-            logger.info(f"✅ Найдено в БД: {len(results)} результатов")
-            return jsonify({'success': True, 'data': results, 'source': 'database'})
+            if db_results:
+                results = [
+                    {
+                        'id': row['coinbase_id'],
+                        'symbol': row['symbol'],
+                        'name': row['name']
+                    }
+                    for row in db_results
+                ]
+                logger.info(f"✅ Найдено в БД: {len(results)} результатов")
+                return jsonify({'success': True, 'data': results, 'source': 'database'})
 
-        # Если в БД нет, ищем через Coinbase API
+        # Ищем через Coinbase API
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -102,22 +139,35 @@ def search_cryptocurrencies():
 @app.route('/api/cryptos/all', methods=['GET'])
 def get_all_cryptocurrencies():
     try:
-        cryptocurrencies = db.get_all_cryptocurrencies()
+        if DB_AVAILABLE:
+            cryptocurrencies = db.get_all_cryptocurrencies()
+            results = [
+                {
+                    'id': row['coinbase_id'],
+                    'symbol': row['symbol'],
+                    'name': row['name']
+                }
+                for row in cryptocurrencies
+            ]
+            source = 'database'
+        else:
+            # Fallback: возвращаем популярные криптовалюты
+            results = [
+                {
+                    'id': crypto_id,
+                    'symbol': data['symbol'],
+                    'name': data['name']
+                }
+                for crypto_id, data in POPULAR_CRYPTOS.items()
+            ]
+            source = 'fallback'
 
-        results = [
-            {
-                'id': row['coinbase_id'],
-                'symbol': row['symbol'],
-                'name': row['name']
-            }
-            for row in cryptocurrencies
-        ]
-
-        logger.info(f"📋 Загружено {len(results)} криптовалют из БД")
+        logger.info(f"📋 Загружено {len(results)} криптовалют ({source})")
         return jsonify({
             'success': True,
             'data': results,
-            'total': len(results)
+            'total': len(results),
+            'source': source
         })
 
     except Exception as e:
@@ -128,9 +178,7 @@ def get_all_cryptocurrencies():
 # 💰 ДАННЫЕ КРИПТОВАЛЮТЫ
 @app.route('/api/crypto/<crypto_id>', methods=['GET'])
 def get_crypto_data(crypto_id):
-    logger.info(f"\n{'=' * 60}")
     logger.info(f"📊 GET /api/crypto/{crypto_id}")
-    logger.info(f"{'=' * 60}")
 
     # Проверка кэша
     if crypto_id in cache:
@@ -160,7 +208,7 @@ def get_crypto_data(crypto_id):
 
         current_price = price_data['price']
 
-        # Генерируем демо-данные (можно заменить на реальные исторические данные)
+        # Генерируем демо-данные
         prices = generate_sample_data(current_price)
         timestamps = generate_timestamps()
 
@@ -178,7 +226,7 @@ def get_crypto_data(crypto_id):
                     'currency': price_data['currency'],
                     'base': price_data['base'],
                     'pair': price_data.get('pair', 'N/A'),
-                    'change_24h': 0,  # Можно получить из Coinbase
+                    'change_24h': 0,
                     'volume_24h': 0
                 },
                 'history': {
@@ -193,8 +241,6 @@ def get_crypto_data(crypto_id):
         cache[crypto_id] = (result, time.time())
 
         logger.info(f"✅ Успех: {crypto_id} - ${current_price:,.2f}")
-        logger.info(f"{'=' * 60}\n")
-
         return jsonify(result)
 
     except Exception as e:
@@ -205,7 +251,7 @@ def get_crypto_data(crypto_id):
 # 🔮 ПРОГНОЗ
 @app.route('/api/predict/<crypto_id>', methods=['POST'])
 def predict_price(crypto_id):
-    logger.info(f"\n🔮 Прогноз для: {crypto_id}")
+    logger.info(f"🔮 Прогноз для: {crypto_id}")
 
     try:
         # Получаем текущую цену для прогноза
@@ -223,7 +269,7 @@ def predict_price(crypto_id):
 
         current_price = price_data['price']
 
-        # Простой прогноз (можно заменить на LSTM)
+        # Простой прогноз
         predictions = simple_prediction(current_price)
 
         logger.info(f"✅ Прогноз создан для {crypto_id}")
@@ -248,11 +294,11 @@ def predict_price(crypto_id):
 # 🛠️ ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
 def generate_sample_data(current_price):
     """Генерация демо-данных"""
-    np.random.seed(42)  # Для воспроизводимости
+    np.random.seed(42)
     prices = [current_price]
     for i in range(89):
-        change = np.random.normal(0, 0.02)  # Случайное изменение ±2%
-        new_price = max(prices[-1] * (1 + change), 0.01)  # Защита от отрицательных цен
+        change = np.random.normal(0, 0.02)
+        new_price = max(prices[-1] * (1 + change), 0.01)
         prices.append(new_price)
     return prices
 
@@ -317,8 +363,8 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"\n{'=' * 60}")
     print(f"🚀 Crypto Tracker с поиском")
-    print(f"📊 База данных: PostgreSQL")
-    print(f"🔍 Поиск: Coinbase API + локальный кэш")
+    print(f"📊 База данных: {'доступна' if DB_AVAILABLE else 'недоступна'}")
+    print(f"🔍 Поиск: Coinbase API")
     print(f"⚡ Асинхронные запросы: aiohttp")
     print(f"{'=' * 60}")
     app.run(host='0.0.0.0', port=port, debug=False)

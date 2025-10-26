@@ -3,6 +3,12 @@ import asyncio
 import ssl
 import certifi
 import logging
+import sys
+import os
+
+# Добавляем корневую директорию в путь
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from models.database import db
 
 logger = logging.getLogger(__name__)
@@ -108,30 +114,6 @@ class CoinbaseService:
             except Exception as e:
                 logger.error(f"❌ Ошибка получения цены {currency_id}: {e}")
                 return None
-
-    async def get_currency_prices_batch(self, currency_ids):
-        """Пакетное получение цен для нескольких криптовалют"""
-        ssl_context = self.create_ssl_context()
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-
-        async with aiohttp.ClientSession(connector=connector) as session:
-            tasks = []
-            for currency_id in currency_ids:
-                task = self.get_currency_price(currency_id)
-                tasks.append(task)
-
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Обрабатываем исключения
-            prices = {}
-            for currency_id, result in zip(currency_ids, results):
-                if isinstance(result, Exception):
-                    logger.error(f"❌ Ошибка для {currency_id}: {result}")
-                    prices[currency_id] = None
-                else:
-                    prices[currency_id] = result
-
-            return prices
 
 
 # Глобальный экземпляр сервиса
