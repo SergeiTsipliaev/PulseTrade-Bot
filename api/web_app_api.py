@@ -9,10 +9,11 @@ import time
 import logging
 from datetime import datetime, timedelta
 
-# Добавляем корневую директорию в PYTHONPATH
+# КРИТИЧЕСКИ ВАЖНО: Правильно добавляем корневую директорию
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, '..'))
-sys.path.insert(0, project_root)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 print(f"🔧 Загрузка модулей из: {project_root}")
 
@@ -32,11 +33,14 @@ except ImportError as e:
 
     # Заглушки для тестирования
     class DatabaseStub:
-        def search_cryptocurrencies(self, query): return []
+        def search_cryptocurrencies(self, query):
+            return []
 
-        def add_cryptocurrency(self, *args): return False
+        def add_cryptocurrency(self, *args):
+            return False
 
-        def get_all_cryptocurrencies(self): return []
+        def get_all_cryptocurrencies(self):
+            return []
 
 
     class CoinbaseServiceStub:
@@ -44,10 +48,13 @@ except ImportError as e:
             return []
 
         async def get_currency_price(self, currency_id):
-            return {'price': 1000.0, 'currency': 'USD', 'base': 'BTC', 'pair': 'BTC-USD'}
-
-        async def get_currency_prices_batch(self, currency_ids):
-            return {cid: {'price': 1000.0} for cid in currency_ids}
+            # Возвращаем тестовые данные
+            return {
+                'price': 45000.0 if currency_id == 'BTC' else 3000.0,
+                'currency': 'USD',
+                'base': currency_id,
+                'pair': f'{currency_id}-USD'
+            }
 
 
     db = DatabaseStub()
@@ -66,13 +73,13 @@ CACHE_TTL = 60
 
 # Популярные криптовалюты для fallback
 POPULAR_CRYPTOS = {
-    'BTC': {'symbol': 'BTC', 'name': 'Bitcoin'},
-    'ETH': {'symbol': 'ETH', 'name': 'Ethereum'},
-    'BNB': {'symbol': 'BNB', 'name': 'Binance Coin'},
-    'SOL': {'symbol': 'SOL', 'name': 'Solana'},
-    'XRP': {'symbol': 'XRP', 'name': 'Ripple'},
-    'ADA': {'symbol': 'ADA', 'name': 'Cardano'},
-    'DOGE': {'symbol': 'DOGE', 'name': 'Dogecoin'},
+    'BTC': {'symbol': 'BTC', 'name': 'Bitcoin', 'emoji': '₿'},
+    'ETH': {'symbol': 'ETH', 'name': 'Ethereum', 'emoji': 'Ξ'},
+    'BNB': {'symbol': 'BNB', 'name': 'Binance Coin', 'emoji': '🔶'},
+    'SOL': {'symbol': 'SOL', 'name': 'Solana', 'emoji': '◎'},
+    'XRP': {'symbol': 'XRP', 'name': 'Ripple', 'emoji': '✕'},
+    'ADA': {'symbol': 'ADA', 'name': 'Cardano', 'emoji': '₳'},
+    'DOGE': {'symbol': 'DOGE', 'name': 'Dogecoin', 'emoji': '🐕'},
 }
 
 
@@ -198,8 +205,9 @@ def get_crypto_data(crypto_id):
     logger.info(f"📊 Асинхронный GET /api/crypto/{crypto_id}")
 
     # Проверка кэша
-    if crypto_id in cache:
-        cached_data, cached_time = cache[crypto_id]
+    cache_key = f"crypto_{crypto_id}"
+    if cache_key in cache:
+        cached_data, cached_time = cache[cache_key]
         age = time.time() - cached_time
         if age < CACHE_TTL:
             logger.info(f"💾 Кэш ({int(age)}с)")
@@ -245,7 +253,7 @@ def get_crypto_data(crypto_id):
         }
 
         # Кэширование
-        cache[crypto_id] = (result, time.time())
+        cache[cache_key] = (result, time.time())
         return result
 
     try:
@@ -256,7 +264,8 @@ def get_crypto_data(crypto_id):
         loop.close()
 
         if result['success']:
-            logger.info(f"✅ Успех: {crypto_id} - ${result['data']['current']['price']:,.2f}")
+            price = result['data']['current']['price']
+            logger.info(f"✅ Успех: {crypto_id} - ${price:,.2f}")
         return jsonify(result)
 
     except Exception as e:
@@ -278,7 +287,7 @@ def predict_price(crypto_id):
 
         current_price = price_data['price']
 
-        # Простой прогноз (можно заменить на LSTM)
+        # Простой прогноз
         predictions = simple_prediction(current_price)
 
         logger.info(f"✅ Прогноз создан для {crypto_id}")
@@ -385,4 +394,4 @@ if __name__ == '__main__':
     print(f"⚡ Асинхронные запросы: aiohttp")
     print(f"🎯 Все endpoint'ы теперь асинхронные!")
     print(f"{'=' * 60}")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)  # Включите debug для разработки
