@@ -1,67 +1,77 @@
-import sys
-import os
-import aiohttp
+import requests
 import numpy as np
 from datetime import datetime, timedelta
-from config import COINGECKO_API
+import certifi
 
 
 class CryptoService:
-    """Сервис для работы с криптовалютными данными"""
+    """Сервис для работы с Coinbase и CryptoCompare API"""
+
+    COINBASE_API = 'https://api.coinbase.com/v2'
+    CRYPTOCOMPARE_API = 'https://min-api.cryptocompare.com/data/v2'
+
+    SYMBOLS = {
+        'bitcoin': 'BTC-USD',
+        'ethereum': 'ETH-USD',
+        'binancecoin': 'BNB-USD',
+        'solana': 'SOL-USD',
+        'ripple': 'XRP-USD'
+    }
 
     @staticmethod
-    async def get_current_price(crypto_id: str):
-        """Получить текущую цену и данные"""
-        url = f"{COINGECKO_API}/coins/{crypto_id}"
-        params = {
-            'localization': 'false',
-            'tickers': 'false',
-            'community_data': 'false',
-            'developer_data': 'false'
-        }
-
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return {
-                        'price': data['market_data']['current_price']['usd'],
-                        'change_24h': data['market_data']['price_change_percentage_24h'],
-                        'change_7d': data['market_data']['price_change_percentage_7d'],
-                        'change_30d': data['market_data']['price_change_percentage_30d'],
-                        'high_24h': data['market_data']['high_24h']['usd'],
-                        'low_24h': data['market_data']['low_24h']['usd'],
-                        'market_cap': data['market_data']['market_cap']['usd'],
-                        'volume_24h': data['market_data']['total_volume']['usd'],
-                        'circulating_supply': data['market_data']['circulating_supply'],
-                        'ath': data['market_data']['ath']['usd'],
-                        'atl': data['market_data']['atl']['usd']
-                    }
-                return None
+    def make_request(url, params=None):
+        """Безопасный HTTP запрос"""
+        try:
+            response = requests.get(url, params=params, timeout=10, verify=certifi.where())
+            return response
+        except requests.exceptions.SSLError:
+            response = requests.get(url, params=params, timeout=10, verify=False)
+            return response
+        except Exception as e:
+            print(f"Request error: {e}")
+            return None
 
     @staticmethod
-    async def get_price_history(crypto_id: str, days: int = 90):
-        """Получить историю цен"""
-        url = f"{COINGECKO_API}/coins/{crypto_id}/market_chart"
+    def get_current_price(crypto_id: str):
+        """Получить текущую цену из Coinbase"""
+        pair = CryptoService.SYMBOLS.get(crypto_id, 'BTC-USD')
+        url = f"{CryptoService.COINBASE_API}/prices/{pair}/spot"
+
+        response = CryptoService.make_request(url)
+        if response and response.status_code == 200:
+            data = response.json()
+            return {
+                'price': float(data['data']['amount']),
+                'currency': data['data']['currency']
+            }
+        return None
+
+    @staticmethod
+    def get_price_history(crypto_id: str, days: int = 90):
+        """Получить историю цен из CryptoCompare"""
+        symbol = CryptoService.SYMBOLS.get(crypto_id, 'BTC-USD').split('-')[0]
+        url = f"{CryptoService.CRYPTOCOMPARE_API}/histoday"
         params = {
-            'vs_currency': 'usd',
-            'days': days,
-            'interval': 'daily' if days > 1 else 'hourly'
+            'fsym': symbol,
+            'tsym': 'USD',
+            'limit': days
         }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    prices = [price[1] for price in data['prices']]
-                    timestamps = [price[0] for price in data['prices']]
+        response = CryptoService.make_request(url, params)
+        if response and response.status_code == 200:
+            data = response.json()
+            if data.get('Response') == 'Success':
+                history_data = data['Data']['Data']
+                prices = [float(d['close']) for d in history_data]
+                timestamps = [d['time'] * 1000 for d in history_data]
+                volumes = [float(d['volumeto']) for d in history_data]
 
-                    return {
-                        'prices': prices,
-                        'timestamps': timestamps,
-                        'volumes': [vol[1] for vol in data['total_volumes']]
-                    }
-                return None
+                return {
+                    'prices': prices,
+                    'timestamps': timestamps,
+                    'volumes': volumes
+                }
+        return None
 
     @staticmethod
     def calculate_technical_indicators(prices):

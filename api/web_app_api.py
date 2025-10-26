@@ -2,11 +2,11 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import os
 import sys
-import aiohttp
-import asyncio
+import requests
 import numpy as np
 import time
 from datetime import datetime, timedelta
+import certifi
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -36,6 +36,22 @@ cache = {}
 CACHE_TTL = 60
 
 
+def make_api_request(url, params=None):
+    """Безопасный запрос с обработкой SSL ошибок"""
+    try:
+        # Сначала пробуем с certifi
+        response = requests.get(url, params=params, timeout=10, verify=certifi.where())
+        return response
+    except requests.exceptions.SSLError:
+        # Если SSL ошибка, пробуем без проверки
+        print(f"⚠️ SSL ошибка для {url}, пробуем без проверки...")
+        response = requests.get(url, params=params, timeout=10, verify=False)
+        return response
+    except Exception as e:
+        print(f"❌ Ошибка запроса к {url}: {e}")
+        return None
+
+
 @app.route('/')
 def index():
     return send_from_directory(app.static_folder, 'index.html')
@@ -51,7 +67,7 @@ def health_check():
     return jsonify({
         'status': 'ok',
         'api': 'Coinbase (10,000 req/hour)',
-        'ssl': 'native (no issues)'
+        'ssl': 'requests + certifi'
     })
 
 
@@ -81,71 +97,63 @@ def get_crypto_data(crypto_id):
             return jsonify(cached_data)
 
     try:
-        async def fetch_coinbase():
-            pair = COINBASE_SYMBOLS[crypto_id]
-            print(f"🔄 Запрос к Coinbase: {pair}")
+        pair = COINBASE_SYMBOLS[crypto_id]
+        print(f"🔄 Запрос к Coinbase: {pair}")
 
-            async with aiohttp.ClientSession() as session:
-                # 1. Текущая цена
-                spot_url = f"{COINBASE_API}/prices/{pair}/spot"
+        # 1. Текущая цена
+        spot_url = f"{COINBASE_API}/prices/{pair}/spot"
+        print(f"  📡 Spot price...")
+        spot_response = make_api_request(spot_url)
 
-                # 2. 24h статистика (используем buy/sell цены)
-                buy_url = f"{COINBASE_API}/prices/{pair}/buy"
-                sell_url = f"{COINBASE_API}/prices/{pair}/sell"
-
-                print(f"  📡 Spot price...")
-                async with session.get(spot_url) as resp1:
-                    print(f"  → HTTP {resp1.status}")
-                    spot_data = await resp1.json() if resp1.status == 200 else None
-
-                print(f"  📡 Buy price...")
-                async with session.get(buy_url) as resp2:
-                    buy_data = await resp2.json() if resp2.status == 200 else None
-
-                print(f"  📡 Sell price...")
-                async with session.get(sell_url) as resp3:
-                    sell_data = await resp3.json() if resp3.status == 200 else None
-
-                # Получаем исторические данные (симулируем через периодические запросы)
-                # Coinbase не дает прямой истории, используем CryptoCompare как fallback
-                history_url = f"https://min-api.cryptocompare.com/data/v2/histoday"
-                params = {
-                    'fsym': pair.split('-')[0],
-                    'tsym': 'USD',
-                    'limit': 90
-                }
-
-                print(f"  📡 History (CryptoCompare)...")
-                async with session.get(history_url, params=params) as resp4:
-                    print(f"  → HTTP {resp4.status}")
-                    history_data = await resp4.json() if resp4.status == 200 else None
-
-                return spot_data, buy_data, sell_data, history_data
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            spot, buy, sell, history = loop.run_until_complete(fetch_coinbase())
-        finally:
-            loop.close()
-
-        if not spot or not history:
-            print(f"❌ Нет данных")
+        if not spot_response or spot_response.status_code != 200:
+            print(f"  ❌ Ошибка spot price")
             return jsonify({
                 'success': False,
-                'error': 'Не удалось получить данные'
+                'error': 'Не удалось получить данные от Coinbase'
             }), 500
 
-        # Парсинг данных
-        current_price = float(spot['data']['amount'])
-        high_24h = float(buy['data']['amount']) if buy else current_price * 1.02
-        low_24h = float(sell['data']['amount']) if sell else current_price * 0.98
+        spot_data = spot_response.json()
+        print(f"  ✅ Spot price получен")
 
-        # История из CryptoCompare
-        if history and history.get('Response') == 'Success':
-            history_raw = history['Data']['Data']
+        # 2. Buy/Sell цены для диапазона
+        buy_url = f"{COINBASE_API}/prices/{pair}/buy"
+        sell_url = f"{COINBASE_API}/prices/{pair}/sell"
+
+        buy_response = make_api_request(buy_url)
+        sell_response = make_api_request(sell_url)
+
+        buy_data = buy_response.json() if buy_response and buy_response.status_code == 200 else None
+        sell_data = sell_response.json() if sell_response and sell_response.status_code == 200 else None
+
+        # 3. Исторические данные
+        symbol = pair.split('-')[0]
+        history_url = "https://min-api.cryptocompare.com/data/v2/histoday"
+        params = {
+            'fsym': symbol,
+            'tsym': 'USD',
+            'limit': 90
+        }
+
+        print(f"  📡 History (CryptoCompare)...")
+        history_response = make_api_request(history_url, params=params)
+
+        history_data = None
+        if history_response and history_response.status_code == 200:
+            history_data = history_response.json()
+            print(f"  ✅ History получен")
+        else:
+            print(f"  ⚠️ History не получен")
+
+        # Парсинг данных
+        current_price = float(spot_data['data']['amount'])
+        high_24h = float(buy_data['data']['amount']) if buy_data else current_price * 1.02
+        low_24h = float(sell_data['data']['amount']) if sell_data else current_price * 0.98
+
+        # Обработка исторических данных
+        if history_data and history_data.get('Response') == 'Success':
+            history_raw = history_data['Data']['Data']
             prices = [float(d['close']) for d in history_raw]
-            timestamps = [d['time'] * 1000 for d in history_raw]  # в миллисекундах
+            timestamps = [d['time'] * 1000 for d in history_raw]
             volumes = [float(d['volumeto']) for d in history_raw]
 
             # Расчет изменений
@@ -179,7 +187,7 @@ def get_crypto_data(crypto_id):
             'change_30d': change_30d,
             'high_24h': high_24h,
             'low_24h': low_24h,
-            'market_cap': 0,  # Coinbase не предоставляет
+            'market_cap': 0,
             'volume_24h': sum(volumes[-1:]) if volumes else 0,
         }
 
@@ -257,44 +265,41 @@ def predict_price(crypto_id):
         }), 400
 
     try:
-        async def fetch_history():
-            pair = COINBASE_SYMBOLS[crypto_id]
-            symbol = pair.split('-')[0]
+        pair = COINBASE_SYMBOLS[crypto_id]
+        symbol = pair.split('-')[0]
 
-            print(f"📊 Получение истории для {symbol}")
+        print(f"📊 Получение истории для {symbol}")
 
-            async with aiohttp.ClientSession() as session:
-                url = "https://min-api.cryptocompare.com/data/v2/histoday"
-                params = {
-                    'fsym': symbol,
-                    'tsym': 'USD',
-                    'limit': 90
-                }
-                async with session.get(url, params=params) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        return data if data.get('Response') == 'Success' else None
-                    return None
+        # Получаем исторические данные
+        history_url = "https://min-api.cryptocompare.com/data/v2/histoday"
+        params = {
+            'fsym': symbol,
+            'tsym': 'USD',
+            'limit': 90
+        }
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            history_data = loop.run_until_complete(fetch_history())
-        finally:
-            loop.close()
+        history_response = make_api_request(history_url, params=params)
 
-        if not history_data:
+        if not history_response or history_response.status_code != 200:
             print(f"❌ Не удалось получить историю")
             return jsonify({
                 'success': False,
                 'error': 'Не удалось получить историю цен'
             }), 500
 
+        history_data = history_response.json()
+        if history_data.get('Response') != 'Success':
+            print(f"❌ Неверный формат истории")
+            return jsonify({
+                'success': False,
+                'error': 'Неверный формат исторических данных'
+            }), 500
+
         # Извлечение цен
         prices = np.array([float(d['close']) for d in history_data['Data']['Data']])
         print(f"📊 Получено {len(prices)} точек данных")
 
-        # Линейная регрессия
+        # Линейная регрессия для прогноза
         x = np.arange(len(prices))
         z = np.polyfit(x, prices, 1)
         print(f"📈 Тренд: {z[0]:+.4f}")
@@ -310,7 +315,7 @@ def predict_price(crypto_id):
         avg_prediction = np.mean(predictions_array)
         price_change = ((avg_prediction - current_price) / current_price) * 100
 
-        # Сигнал
+        # Определение сигнала
         if price_change > 5:
             signal, signal_text = 'STRONG_BUY', '🟢 Сильная покупка'
         elif price_change > 2:
@@ -359,8 +364,8 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"\n{'=' * 60}")
     print(f"🚀 Flask + Coinbase API + CryptoCompare")
-    print(f"📊 Rate limit: 10,000 requests/hour")
-    print(f"🔐 SSL: Native (no certificate issues)")
+    print(f"📊 Используем: requests (синхронные запросы)")
+    print(f"🔐 SSL: certifi + fallback")
     print(f"{'=' * 60}")
     print("\n📍 Routes:")
     for rule in app.url_map.iter_rules():
