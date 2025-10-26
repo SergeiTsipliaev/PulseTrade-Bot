@@ -60,6 +60,20 @@ except ImportError as e:
     db = DatabaseStub()
     coinbase_service = CoinbaseServiceStub()
 
+
+# Проверяем реальную доступность БД
+def check_db_availability():
+    """Проверяем реальную доступность БД"""
+    try:
+        if hasattr(db, 'is_connected'):
+            return db.is_connected()
+        return DB_AVAILABLE
+    except:
+        return False
+
+
+DB_REALLY_AVAILABLE = check_db_availability()
+
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -98,7 +112,7 @@ def health_check():
     return jsonify({
         'status': 'ok',
         'api': 'Coinbase API',
-        'database': 'available' if DB_AVAILABLE else 'unavailable',
+        'database': 'available' if DB_REALLY_AVAILABLE else 'unavailable',
         'async': True,
         'timestamp': datetime.now().isoformat()
     })
@@ -115,36 +129,43 @@ def search_cryptocurrencies():
     logger.info(f"🔍 Асинхронный поиск: '{query}'")
 
     async def perform_search():
-        # Сначала ищем в БД (если доступна)
-        if DB_AVAILABLE:
-            db_results = db.search_cryptocurrencies(query)
+        # Сначала ищем в БД (если реально доступна)
+        if DB_REALLY_AVAILABLE:
+            try:
+                db_results = db.search_cryptocurrencies(query)
 
-            if db_results:
-                results = [
-                    {
-                        'id': row['coinbase_id'],
-                        'symbol': row['symbol'],
-                        'name': row['name']
-                    }
-                    for row in db_results
-                ]
-                logger.info(f"✅ Найдено в БД: {len(results)} результатов")
-                return {'success': True, 'data': results, 'source': 'database'}
+                if db_results and len(db_results) > 0:
+                    results = [
+                        {
+                            'id': row['coinbase_id'],
+                            'symbol': row['symbol'],
+                            'name': row['name']
+                        }
+                        for row in db_results
+                    ]
+                    logger.info(f"✅ Найдено в БД: {len(results)} результатов")
+                    return {'success': True, 'data': results, 'source': 'database'}
+            except Exception as e:
+                logger.warning(f"⚠️ Ошибка поиска в БД: {e}")
 
         # Ищем через Coinbase API асинхронно
-        api_results = await coinbase_service.search_currencies(query)
+        try:
+            api_results = await coinbase_service.search_currencies(query)
 
-        results = [
-            {
-                'id': currency['code'],
-                'symbol': currency['symbol'],
-                'name': currency['name']
-            }
-            for currency in api_results
-        ]
+            results = [
+                {
+                    'id': currency['code'],
+                    'symbol': currency['symbol'],
+                    'name': currency['name']
+                }
+                for currency in api_results
+            ]
 
-        logger.info(f"✅ Найдено через API: {len(results)} результатов")
-        return {'success': True, 'data': results, 'source': 'coinbase'}
+            logger.info(f"✅ Найдено через API: {len(results)} результатов")
+            return {'success': True, 'data': results, 'source': 'coinbase'}
+        except Exception as e:
+            logger.error(f"❌ Ошибка поиска в API: {e}")
+            return {'success': True, 'data': [], 'source': 'error'}
 
     try:
         # Запускаем асинхронную функцию
@@ -163,7 +184,7 @@ def search_cryptocurrencies():
 @app.route('/api/cryptos/all', methods=['GET'])
 def get_all_cryptocurrencies():
     try:
-        if DB_AVAILABLE:
+        if DB_REALLY_AVAILABLE:
             cryptocurrencies = db.get_all_cryptocurrencies()
             results = [
                 {
@@ -389,9 +410,9 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"\n{'=' * 60}")
     print(f"🚀 Crypto Tracker с поиском")
-    print(f"📊 База данных: {'доступна' if DB_AVAILABLE else 'недоступна'}")
+    print(f"📊 База данных: {'доступна' if DB_REALLY_AVAILABLE else 'недоступна'}")
     print(f"🔍 Поиск: Coinbase API")
     print(f"⚡ Асинхронные запросы: aiohttp")
     print(f"🎯 Все endpoint'ы теперь асинхронные!")
     print(f"{'=' * 60}")
-    app.run(host='0.0.0.0', port=port, debug=True)  # Включите debug для разработки
+    app.run(host='0.0.0.0', port=port, debug=True)
