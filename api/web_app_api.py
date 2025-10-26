@@ -9,12 +9,12 @@ import time
 import logging
 from datetime import datetime, timedelta
 
-# КРИТИЧЕСКИ ВАЖНО: Добавляем корневую директорию в PYTHONPATH
+# Добавляем корневую директорию в PYTHONPATH
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, '..'))
 sys.path.insert(0, project_root)
 
-print(f"🔧 PYTHONPATH: {sys.path}")
+print(f"🔧 Загрузка модулей из: {project_root}")
 
 try:
     from services.coinbase_service import coinbase_service
@@ -24,9 +24,9 @@ try:
     print("✅ Все модули загружены успешно")
 except ImportError as e:
     print(f"❌ Ошибка импорта: {e}")
-    print("❌ Проверьте наличие файлов:")
-    print("   - services/coinbase_service.py")
-    print("   - models/database.py")
+    import traceback
+
+    traceback.print_exc()
     DB_AVAILABLE = False
 
 
@@ -39,7 +39,14 @@ except ImportError as e:
         def get_all_cryptocurrencies(self): return []
 
 
+    class CoinbaseServiceStub:
+        async def search_currencies(self, query): return []
+
+        async def get_currency_price(self, currency_id): return None
+
+
     db = DatabaseStub()
+    coinbase_service = CoinbaseServiceStub()
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
