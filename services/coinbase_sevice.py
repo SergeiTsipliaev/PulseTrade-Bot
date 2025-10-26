@@ -7,7 +7,9 @@ import sys
 import os
 
 # Добавляем корневую директорию в путь
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, '..'))
+sys.path.insert(0, project_root)
 
 from models.database import db
 

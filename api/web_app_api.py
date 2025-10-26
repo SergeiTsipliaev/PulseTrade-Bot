@@ -9,30 +9,34 @@ import time
 import logging
 from datetime import datetime, timedelta
 
-# Добавляем корневую директорию в путь для импортов
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# КРИТИЧЕСКИ ВАЖНО: Добавляем корневую директорию в PYTHONPATH
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, '..'))
+sys.path.insert(0, project_root)
+
+print(f"🔧 PYTHONPATH: {sys.path}")
 
 try:
     from services.coinbase_service import coinbase_service
     from models.database import db
 
     DB_AVAILABLE = True
+    print("✅ Все модули загружены успешно")
 except ImportError as e:
-    print(f"⚠️ Предупреждение: {e}")
-    print("⚠️ База данных недоступна, используется режим без БД")
+    print(f"❌ Ошибка импорта: {e}")
+    print("❌ Проверьте наличие файлов:")
+    print("   - services/coinbase_service.py")
+    print("   - models/database.py")
     DB_AVAILABLE = False
 
 
-    # Создаем заглушки для тестирования
+    # Заглушки для тестирования
     class DatabaseStub:
-        def search_cryptocurrencies(self, query):
-            return []
+        def search_cryptocurrencies(self, query): return []
 
-        def add_cryptocurrency(self, *args):
-            return False
+        def add_cryptocurrency(self, *args): return False
 
-        def get_all_cryptocurrencies(self):
-            return []
+        def get_all_cryptocurrencies(self): return []
 
 
     db = DatabaseStub()
