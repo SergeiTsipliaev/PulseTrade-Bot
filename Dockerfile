@@ -1,19 +1,25 @@
-FROM python:3.10-slim
+FROM python:3.13.5
 
 WORKDIR /app
 
-# Копируем requirements
+# Установка зависимостей для PostgreSQL
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Копирование requirements
 COPY requirements.txt .
 
-# Устанавливаем зависимости
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Установка Python зависимостей
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем весь проект
+# Копирование исходного кода
 COPY . .
 
-# Порт для Flask
+# Создание директорий
+RUN mkdir -p /app/logs
+
 EXPOSE 5000
 
-# Команда запуска (можно переопределить)
-CMD ["python", "api/web_app_api.py"]
+CMD ["python", "-m", "api.web_app_api"]

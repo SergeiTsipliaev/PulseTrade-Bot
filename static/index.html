@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Crypto LSTM Predictor</title>
+    <title>Crypto Tracker - Поиск криптовалют</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
@@ -23,7 +23,7 @@
 
         .header {
             text-align: center;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
 
         .header h1 {
@@ -32,11 +32,84 @@
             margin-bottom: 8px;
         }
 
-        .header p {
+        /* ПОИСК */
+        .search-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid var(--tg-theme-button-color, #3390ec);
+            border-radius: 12px;
+            font-size: 16px;
+            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            color: var(--tg-theme-text-color, #000000);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--tg-theme-button-color, #3390ec);
+        }
+
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--tg-theme-bg-color, #ffffff);
+            border: 1px solid var(--tg-theme-hint-color, #999);
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .search-result-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--tg-theme-hint-color, #eee);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .search-result-item:hover {
+            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+        }
+
+        .crypto-symbol {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .crypto-name {
             color: var(--tg-theme-hint-color, #999);
             font-size: 14px;
         }
 
+        /* КНОПКА ВСЕХ КРИПТОВАЛЮТ */
+        .all-cryptos-btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            border: 2px solid var(--tg-theme-button-color, #3390ec);
+            border-radius: 12px;
+            color: var(--tg-theme-button-color, #3390ec);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .all-cryptos-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* СЕТКА КРИПТОВАЛЮТ */
         .crypto-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -64,16 +137,17 @@
             transform: scale(0.95);
         }
 
-        .crypto-symbol {
+        .crypto-emoji {
             font-size: 32px;
             margin-bottom: 8px;
         }
 
-        .crypto-name {
+        .crypto-symbol-small {
             font-size: 12px;
             font-weight: 600;
         }
 
+        /* ОСТАЛЬНЫЕ СТИЛИ (из предыдущей версии) */
         .price-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 16px;
@@ -245,43 +319,134 @@
             font-weight: bold;
             margin-bottom: 16px;
         }
+
+        /* МОДАЛЬНОЕ ОКНО ВСЕХ КРИПТОВАЛЮТ */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            padding: 20px;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--tg-theme-bg-color, #ffffff);
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 400px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--tg-theme-text-color, #000000);
+        }
+
+        .crypto-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .crypto-list-item {
+            padding: 12px 16px;
+            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s;
+        }
+
+        .crypto-list-item:active {
+            transform: scale(0.98);
+            background: var(--tg-theme-button-color, #3390ec);
+            color: white;
+        }
     </style>
 </head>
 <body>
     <div id="app">
         <div class="header">
-            <h1>🚀 Crypto Predictor</h1>
-            <p>AI прогноз криптовалют с LSTM</p>
+            <h1>🔍 Crypto Tracker</h1>
+            <p>Поиск и анализ криптовалют</p>
         </div>
 
-        <!-- Выбор криптовалюты -->
-        <div class="section-title">Выберите криптовалюту</div>
+        <!-- ПОИСК -->
+        <div class="search-container">
+            <input type="text" class="search-input" id="searchInput"
+                   placeholder="Введите название или символ криптовалюты..."
+                   autocomplete="off">
+            <div class="search-results" id="searchResults"></div>
+        </div>
+
+        <!-- КНОПКА ВСЕХ КРИПТОВАЛЮТ -->
+        <button class="all-cryptos-btn" id="allCryptosBtn">
+            📋 Показать все криптовалюты
+        </button>
+
+        <!-- МОДАЛЬНОЕ ОКНО ВСЕХ КРИПТОВАЛЮТ -->
+        <div class="modal" id="allCryptosModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-title">Все криптовалюты</div>
+                    <button class="close-modal" id="closeModal">×</button>
+                </div>
+                <div class="crypto-list" id="cryptoList"></div>
+            </div>
+        </div>
+
+        <!-- ОСТАЛЬНАЯ ЧАСТЬ ИНТЕРФЕЙСА -->
+        <div class="section-title">Популярные криптовалюты</div>
         <div class="crypto-grid" id="cryptoGrid"></div>
 
-        <!-- Текущая цена -->
         <div class="price-card" id="priceCard">
             <div id="cryptoName"></div>
             <div class="price-main" id="currentPrice"></div>
             <div class="price-change" id="priceChange"></div>
         </div>
 
-        <!-- График -->
         <div class="chart-container" id="chartContainer">
             <canvas id="priceChart"></canvas>
         </div>
 
-        <!-- Индикаторы -->
         <div id="indicatorsSection" class="hidden">
             <div class="section-title">📊 Технический анализ</div>
             <div class="indicators-grid" id="indicatorsGrid"></div>
         </div>
 
-        <!-- Кнопка прогноза -->
         <button class="btn btn-primary hidden" id="predictBtn">
             🔮 Сделать прогноз LSTM
         </button>
 
-        <!-- Прогноз -->
         <div class="prediction-section" id="predictionSection">
             <div class="section-title">🔮 Прогноз на 7 дней</div>
             <div class="prediction-card">
@@ -304,7 +469,6 @@
             </div>
         </div>
 
-        <!-- Загрузка -->
         <div class="loading hidden" id="loading">
             <div class="spinner"></div>
             <div id="loadingText">Загрузка данных...</div>

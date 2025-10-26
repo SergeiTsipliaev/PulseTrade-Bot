@@ -1,32 +1,48 @@
+version: '3.8'
+
 services:
-  bot:
-    build: .
-    command: python bot/main.py
-    env_file:
-      - .env
-    depends_on:
-      - api
-    restart: unless-stopped
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: cryptobot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   api:
     build: .
-    command: python api/web_app_api.py
     ports:
       - "5000:5000"
-    env_file:
-      - .env
+    environment:
+      - DB_HOST=postgres
+      - DB_NAME=cryptobot
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_PORT=5432
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
-      - ./models:/app/models
-    restart: unless-stopped
+      - ./:/app
+    command: python -m api.web_app_api
 
   nginx:
     image: nginx:alpine
     ports:
       - "80:80"
-      - "443:443"
     volumes:
-      - ./frontend:/usr/share/nginx/html
       - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./static:/usr/share/nginx/html
     depends_on:
       - api
-    restart: unless-stopped
+
+volumes:
+  postgres_data:
