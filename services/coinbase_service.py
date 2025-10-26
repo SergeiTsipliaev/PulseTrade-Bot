@@ -50,7 +50,7 @@ class CoinbaseService:
             return None
 
     async def search_currencies(self, query):
-        """Поиск криптовалют через Coinbase API"""
+        """Асинхронный поиск криптовалют через Coinbase API"""
         ssl_context = self.create_ssl_context()
         connector = aiohttp.TCPConnector(ssl=ssl_context)
 
@@ -81,14 +81,14 @@ class CoinbaseService:
                     )
 
                 logger.info(f"🔍 Найдено {len(filtered)} криптовалют для запроса '{query}'")
-                return filtered[:10]  # Возвращаем топ-10 результатов
+                return filtered[:10]
 
             except Exception as e:
                 logger.error(f"❌ Ошибка поиска в Coinbase: {e}")
                 return []
 
     async def get_currency_price(self, currency_id):
-        """Получение цены криптовалюты"""
+        """Асинхронное получение цены криптовалюты"""
         ssl_context = self.create_ssl_context()
         connector = aiohttp.TCPConnector(ssl=ssl_context)
 

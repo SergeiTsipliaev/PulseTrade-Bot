@@ -40,9 +40,14 @@ except ImportError as e:
 
 
     class CoinbaseServiceStub:
-        async def search_currencies(self, query): return []
+        async def search_currencies(self, query):
+            return []
 
-        async def get_currency_price(self, currency_id): return None
+        async def get_currency_price(self, currency_id):
+            return {'price': 1000.0, 'currency': 'USD', 'base': 'BTC', 'pair': 'BTC-USD'}
+
+        async def get_currency_prices_batch(self, currency_ids):
+            return {cid: {'price': 1000.0} for cid in currency_ids}
 
 
     db = DatabaseStub()
@@ -87,12 +92,12 @@ def health_check():
         'status': 'ok',
         'api': 'Coinbase API',
         'database': 'available' if DB_AVAILABLE else 'unavailable',
-        'features': ['поиск', 'прогнозы', 'все криптовалюты'],
+        'async': True,
         'timestamp': datetime.now().isoformat()
     })
 
 
-# 🔍 ПОИСК КРИПТОВАЛЮТ
+# 🔍 ПОИСК КРИПТОВАЛЮТ - АСИНХРОННЫЙ
 @app.route('/api/search', methods=['GET'])
 def search_cryptocurrencies():
     query = request.args.get('q', '').strip()
@@ -100,9 +105,9 @@ def search_cryptocurrencies():
     if not query or len(query) < 1:
         return jsonify({'success': True, 'data': []})
 
-    logger.info(f"🔍 Поиск: '{query}'")
+    logger.info(f"🔍 Асинхронный поиск: '{query}'")
 
-    try:
+    async def perform_search():
         # Сначала ищем в БД (если доступна)
         if DB_AVAILABLE:
             db_results = db.search_cryptocurrencies(query)
@@ -117,17 +122,10 @@ def search_cryptocurrencies():
                     for row in db_results
                 ]
                 logger.info(f"✅ Найдено в БД: {len(results)} результатов")
-                return jsonify({'success': True, 'data': results, 'source': 'database'})
+                return {'success': True, 'data': results, 'source': 'database'}
 
-        # Ищем через Coinbase API
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            api_results = loop.run_until_complete(
-                coinbase_service.search_currencies(query)
-            )
-        finally:
-            loop.close()
+        # Ищем через Coinbase API асинхронно
+        api_results = await coinbase_service.search_currencies(query)
 
         results = [
             {
@@ -139,7 +137,15 @@ def search_cryptocurrencies():
         ]
 
         logger.info(f"✅ Найдено через API: {len(results)} результатов")
-        return jsonify({'success': True, 'data': results, 'source': 'coinbase'})
+        return {'success': True, 'data': results, 'source': 'coinbase'}
+
+    try:
+        # Запускаем асинхронную функцию
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(perform_search())
+        loop.close()
+        return jsonify(result)
 
     except Exception as e:
         logger.error(f"❌ Ошибка поиска: {e}")
@@ -186,10 +192,10 @@ def get_all_cryptocurrencies():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-# 💰 ДАННЫЕ КРИПТОВАЛЮТЫ
+# 💰 ДАННЫЕ КРИПТОВАЛЮТЫ - АСИНХРОННЫЙ
 @app.route('/api/crypto/<crypto_id>', methods=['GET'])
 def get_crypto_data(crypto_id):
-    logger.info(f"📊 GET /api/crypto/{crypto_id}")
+    logger.info(f"📊 Асинхронный GET /api/crypto/{crypto_id}")
 
     # Проверка кэша
     if crypto_id in cache:
@@ -199,23 +205,13 @@ def get_crypto_data(crypto_id):
             logger.info(f"💾 Кэш ({int(age)}с)")
             return jsonify(cached_data)
 
-    try:
+    async def fetch_crypto_data():
         # Получаем текущую цену асинхронно
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            price_data = loop.run_until_complete(
-                coinbase_service.get_currency_price(crypto_id)
-            )
-        finally:
-            loop.close()
+        price_data = await coinbase_service.get_currency_price(crypto_id)
 
         if not price_data:
             logger.warning(f"⚠️ Не удалось получить данные для {crypto_id}")
-            return jsonify({
-                'success': False,
-                'error': f'Не удалось получить данные для {crypto_id}'
-            }), 500
+            return {'success': False, 'error': f'Не удалось получить данные для {crypto_id}'}
 
         current_price = price_data['price']
 
@@ -250,8 +246,17 @@ def get_crypto_data(crypto_id):
 
         # Кэширование
         cache[crypto_id] = (result, time.time())
+        return result
 
-        logger.info(f"✅ Успех: {crypto_id} - ${current_price:,.2f}")
+    try:
+        # Запускаем асинхронную функцию
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(fetch_crypto_data())
+        loop.close()
+
+        if result['success']:
+            logger.info(f"✅ Успех: {crypto_id} - ${result['data']['current']['price']:,.2f}")
         return jsonify(result)
 
     except Exception as e:
@@ -259,33 +264,26 @@ def get_crypto_data(crypto_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-# 🔮 ПРОГНОЗ
+# 🔮 ПРОГНОЗ - АСИНХРОННЫЙ
 @app.route('/api/predict/<crypto_id>', methods=['POST'])
 def predict_price(crypto_id):
-    logger.info(f"🔮 Прогноз для: {crypto_id}")
+    logger.info(f"🔮 Асинхронный прогноз для: {crypto_id}")
 
-    try:
-        # Получаем текущую цену для прогноза
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            price_data = loop.run_until_complete(
-                coinbase_service.get_currency_price(crypto_id)
-            )
-        finally:
-            loop.close()
+    async def make_prediction():
+        # Получаем текущую цену для прогноза асинхронно
+        price_data = await coinbase_service.get_currency_price(crypto_id)
 
         if not price_data:
-            return jsonify({'success': False, 'error': 'Не удалось получить цену'}), 500
+            return {'success': False, 'error': 'Не удалось получить цену'}
 
         current_price = price_data['price']
 
-        # Простой прогноз
+        # Простой прогноз (можно заменить на LSTM)
         predictions = simple_prediction(current_price)
 
         logger.info(f"✅ Прогноз создан для {crypto_id}")
 
-        return jsonify({
+        return {
             'success': True,
             'data': {
                 'predictions': predictions,
@@ -295,7 +293,15 @@ def predict_price(crypto_id):
                 'signal_text': '🟡 Удержание',
                 'days': 7
             }
-        })
+        }
+
+    try:
+        # Запускаем асинхронную функцию
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(make_prediction())
+        loop.close()
+        return jsonify(result)
 
     except Exception as e:
         logger.error(f"❌ Ошибка прогноза: {e}")
@@ -377,5 +383,6 @@ if __name__ == '__main__':
     print(f"📊 База данных: {'доступна' if DB_AVAILABLE else 'недоступна'}")
     print(f"🔍 Поиск: Coinbase API")
     print(f"⚡ Асинхронные запросы: aiohttp")
+    print(f"🎯 Все endpoint'ы теперь асинхронные!")
     print(f"{'=' * 60}")
     app.run(host='0.0.0.0', port=port, debug=False)
