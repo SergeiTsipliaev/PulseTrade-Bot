@@ -1,16 +1,7 @@
 import os
 
-# Binance API (1200 req/min!)
-BINANCE_API = 'https://api.binance.com/api/v3'
-
-# Mapping crypto IDs to Binance symbols
-BINANCE_SYMBOLS = {
-    'bitcoin': 'BTCUSDT',
-    'ethereum': 'ETHUSDT',
-    'binancecoin': 'BNBUSDT',
-    'solana': 'SOLUSDT',
-    'ripple': 'XRPUSDT'
-}
+# API settings
+COINGECKO_API = 'https://sandbox-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
 
 # LSTM settings
 SEQUENCE_LENGTH = 60
@@ -26,6 +17,6 @@ CRYPTOS = {
     'XRP': {'id': 'ripple', 'name': 'Ripple'},
 }
 
-# Bot settings
+# Bot settings (только для бота, не для API)
 BOT_TOKEN = os.getenv('BOT_TOKEN', '')
 WEB_APP_URL = os.getenv('WEB_APP_URL', '')

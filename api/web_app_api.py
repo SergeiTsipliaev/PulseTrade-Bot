@@ -2,27 +2,20 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import os
 import sys
+import ssl
 import aiohttp
 import asyncio
 import numpy as np
 import time
-import ssl
-from datetime import datetime
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 app = Flask(__name__, static_folder='../static')
 CORS(app)
 
-# Binance API (1200 req/min!)
-BINANCE_API = 'https://api.binance.com/api/v3'
-BINANCE_SYMBOLS = {
-    'bitcoin': 'BTCUSDT',
-    'ethereum': 'ETHUSDT',
-    'binancecoin': 'BNBUSDT',
-    'solana': 'SOLUSDT',
-    'ripple': 'XRPUSDT'
-}
+# Кэш для данных (чтобы избежать rate limit)
+cache = {}
+CACHE_TTL = 60  # 60 секунд
 
 CRYPTOS = {
     'bitcoin': {'id': 'bitcoin', 'symbol': 'BTC', 'name': 'Bitcoin'},
@@ -31,21 +24,6 @@ CRYPTOS = {
     'solana': {'id': 'solana', 'symbol': 'SOL', 'name': 'Solana'},
     'ripple': {'id': 'ripple', 'symbol': 'XRP', 'name': 'Ripple'},
 }
-
-# SSL Context для избежания ошибок сертификатов
-try:
-    import certifi
-    ssl_context = ssl.create_default_context(cafile=certifi.where())
-except ImportError:
-    # Если certifi не установлен, используем дефолтный контекст
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-    print("⚠️  certifi не найден, SSL проверка отключена (не рекомендуется для продакшена)")
-
-# Кэш (опциональный, т.к. лимит высокий)
-cache = {}
-CACHE_TTL = 30  # 30 секунд
 
 
 @app.route('/')
@@ -60,7 +38,7 @@ def app_js():
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    return jsonify({'status': 'ok', 'api': 'Binance (1200 req/min)'})
+    return jsonify({'status': 'ok'})
 
 
 @app.route('/api/cryptos', methods=['GET'])
@@ -70,85 +48,97 @@ def get_cryptos():
 
 @app.route('/api/crypto/<crypto_id>', methods=['GET'])
 def get_crypto_data(crypto_id):
-    print(f"=== GET /api/crypto/{crypto_id} (Binance) ===")
+    print(f"=== GET /api/crypto/{crypto_id} ===")
 
-    # Кэш (опционально)
+    # Проверяем кэш
     if crypto_id in cache:
         cached_data, cached_time = cache[crypto_id]
         age = time.time() - cached_time
         if age < CACHE_TTL:
-            print(f"  💾 Cache ({int(age)}s)")
+            print(f"  💾 Returning cached data (age: {int(age)}s)")
             return jsonify(cached_data)
+        else:
+            print(f"  ⏰ Cache expired (age: {int(age)}s)")
 
     try:
-        async def fetch_binance():
-            symbol = BINANCE_SYMBOLS.get(crypto_id, 'BTCUSDT')
+        async def fetch_all():
+            # Добавляем задержку для избежания rate limit
+            await asyncio.sleep(0.5)
 
-            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            connector = aiohttp.TCPConnector(ssl=False)
             async with aiohttp.ClientSession(connector=connector) as session:
-                # 1. Current price + 24h stats
-                url1 = f"{BINANCE_API}/ticker/24hr"
-                params1 = {'symbol': symbol}
+                # Current data
+                url1 = f"https://sandbox-api.coinmarketcap.com/v1/cryptocurrency/listings/latest{crypto_id}"
+                params1 = {'localization': 'false', 'tickers': 'false', 'community_data': 'false',
+                           'developer_data': 'false'}
 
-                # 2. Historical klines (90 days, daily)
-                url2 = f"{BINANCE_API}/klines"
-                params2 = {
-                    'symbol': symbol,
-                    'interval': '1d',  # daily
-                    'limit': 90  # last 90 days
-                }
+                print(f"  📡 Fetching current data from: {url1}")
 
-                print(f"  📡 Fetching {symbol}...")
+                # History
+                url2 = f"https://sandbox-api.coinmarketcap.com/v1/cryptocurrency/listings/latest{crypto_id}/market_chart"
+                params2 = {'vs_currency': 'usd', 'days': 90, 'interval': 'daily'}
+
+                print(f"  📡 Fetching history from: {url2}")
 
                 async with session.get(url1, params=params1) as resp1:
-                    print(f"  ✅ Ticker: {resp1.status}")
-                    ticker = await resp1.json() if resp1.status == 200 else None
+                    print(f"  ✅ Current data status: {resp1.status}")
+                    if resp1.status == 200:
+                        current = await resp1.json()
+                    elif resp1.status == 429:
+                        print(f"  ⚠️  Rate limit hit for current data")
+                        return None, None
+                    else:
+                        current = None
 
                 async with session.get(url2, params=params2) as resp2:
-                    print(f"  ✅ Klines: {resp2.status}")
-                    klines = await resp2.json() if resp2.status == 200 else None
+                    print(f"  ✅ History data status: {resp2.status}")
+                    if resp2.status == 200:
+                        history = await resp2.json()
+                    elif resp2.status == 429:
+                        print(f"  ⚠️  Rate limit hit for history data")
+                        return None, None
+                    else:
+                        history = None
 
-                return ticker, klines
+                return current, history
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            ticker_data, klines_data = loop.run_until_complete(fetch_binance())
+            current_raw, history_raw = loop.run_until_complete(fetch_all())
         finally:
             loop.close()
 
-        if not ticker_data or not klines_data:
-            print(f"  ❌ No data")
-            return jsonify({'success': False, 'error': 'Failed to fetch data'}), 404
+        print(f"  📊 Current data: {'✅ OK' if current_raw else '❌ None'}")
+        print(f"  📊 History data: {'✅ OK' if history_raw else '❌ None'}")
 
-        # Parse Binance ticker data
-        current_price = float(ticker_data['lastPrice'])
-        change_24h = float(ticker_data['priceChangePercent'])
+        if not current_raw or not history_raw:
+            print(f"  ❌ Missing data - returning 404")
+            error_msg = 'Rate limit exceeded. Please wait a minute.' if current_raw is None else 'Failed to fetch data'
+            return jsonify({'success': False, 'error': error_msg}), 404
+
+        print(f"  🔄 Processing data...")
 
         current_data = {
-            'price': current_price,
-            'change_24h': change_24h,
-            'change_7d': 0,  # Binance не предоставляет напрямую
-            'change_30d': 0,
-            'high_24h': float(ticker_data['highPrice']),
-            'low_24h': float(ticker_data['lowPrice']),
-            'market_cap': 0,  # Binance не предоставляет
-            'volume_24h': float(ticker_data['quoteVolume']),
+            'price': current_raw['market_data']['current_price']['usd'],
+            'change_24h': current_raw['market_data']['price_change_percentage_24h'],
+            'change_7d': current_raw['market_data'].get('price_change_percentage_7d', 0),
+            'change_30d': current_raw['market_data'].get('price_change_percentage_30d', 0),
+            'high_24h': current_raw['market_data']['high_24h']['usd'],
+            'low_24h': current_raw['market_data']['low_24h']['usd'],
+            'market_cap': current_raw['market_data']['market_cap']['usd'],
+            'volume_24h': current_raw['market_data']['total_volume']['usd'],
         }
 
-        # Parse klines (OHLCV data)
-        # Format: [timestamp, open, high, low, close, volume, ...]
-        prices = [float(k[4]) for k in klines_data]  # close prices
-        timestamps = [k[0] for k in klines_data]  # timestamps
-        volumes = [float(k[5]) for k in klines_data]
+        prices = [p[1] for p in history_raw['prices']]
+        timestamps = [p[0] for p in history_raw['prices']]
 
         history = {
             'prices': prices,
             'timestamps': timestamps,
-            'volumes': volumes
+            'volumes': [v[1] for v in history_raw['total_volumes']]
         }
 
-        # Technical indicators
         prices_array = np.array(prices)
         deltas = np.diff(prices_array)
         gains = np.where(deltas > 0, deltas, 0)
@@ -160,8 +150,8 @@ def get_crypto_data(crypto_id):
         rsi = 100 - (100 / (1 + rs))
 
         ma_7 = float(np.mean(prices_array[-7:])) if len(prices_array) >= 7 else float(prices_array[-1])
-        ma_25 = float(np.mean(prices_array[-25:])) if len(prices_array) >= 25 else ma_7
-        ma_50 = float(np.mean(prices_array[-50:])) if len(prices_array) >= 50 else ma_7
+        ma_25 = float(np.mean(prices_array[-25:])) if len(prices_array) >= 25 else float(prices_array[-1])
+        ma_50 = float(np.mean(prices_array[-50:])) if len(prices_array) >= 50 else float(prices_array[-1])
 
         returns = np.diff(prices_array) / prices_array[:-1]
         volatility = float(np.std(returns) * 100)
@@ -185,12 +175,21 @@ def get_crypto_data(crypto_id):
             }
         }
 
+        # Сохраняем в кэш
         cache[crypto_id] = (result, time.time())
-        print(f"✅ Success")
+
+        print(f"✅ Success for {crypto_id} (cached)")
         return jsonify(result)
 
+    except KeyError as e:
+        print(f"❌ KeyError: {e}")
+        print(f"   Missing key in CoinGecko response")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Missing data key: {str(e)}'}), 500
     except Exception as e:
         print(f"❌ Error: {e}")
+        print(f"   Error type: {type(e).__name__}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -202,33 +201,26 @@ def predict_price(crypto_id):
 
     try:
         async def fetch_history():
-            symbol = BINANCE_SYMBOLS.get(crypto_id, 'BTCUSDT')
+            await asyncio.sleep(0.5)  # Задержка для rate limit
 
-            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            connector = aiohttp.TCPConnector(ssl=False)
             async with aiohttp.ClientSession(connector=connector) as session:
-                url = f"{BINANCE_API}/klines"
-                params = {
-                    'symbol': symbol,
-                    'interval': '1d',
-                    'limit': 90
-                }
+                url = f"https://api.coingecko.com/api/v3/coins/{crypto_id}/market_chart"
+                params = {'vs_currency': 'usd', 'days': 90, 'interval': 'daily'}
                 async with session.get(url, params=params) as resp:
                     return await resp.json() if resp.status == 200 else None
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            klines_data = loop.run_until_complete(fetch_history())
+            history_raw = loop.run_until_complete(fetch_history())
         finally:
             loop.close()
 
-        if not klines_data:
+        if not history_raw:
             return jsonify({'success': False, 'error': 'Failed to fetch history'}), 404
 
-        # Extract close prices
-        prices = np.array([float(k[4]) for k in klines_data])
-
-        # Linear regression prediction
+        prices = np.array([p[1] for p in history_raw['prices']])
         x = np.arange(len(prices))
         z = np.polyfit(x, prices, 1)
 
@@ -254,7 +246,7 @@ def predict_price(crypto_id):
         else:
             signal, signal_text = 'HOLD', '🟡 Удержание'
 
-        print(f"✅ Prediction done")
+        print(f"✅ Prediction success for {crypto_id}")
         return jsonify({
             'success': True,
             'data': {
@@ -271,7 +263,7 @@ def predict_price(crypto_id):
         })
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Prediction error: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -280,10 +272,9 @@ def predict_price(crypto_id):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"\n{'=' * 50}")
-    print(f"🚀 Flask + Binance API")
-    print(f"📊 Rate limit: 1200 requests/min")
+    print(f"🚀 Flask app starting on port {port}")
     print(f"{'=' * 50}")
-    print("\n📍 Routes:")
+    print("\n📍 Available routes:")
     for rule in app.url_map.iter_rules():
         methods = ','.join(sorted(rule.methods - {'HEAD', 'OPTIONS'}))
         print(f"   {methods:6s} {rule}")
