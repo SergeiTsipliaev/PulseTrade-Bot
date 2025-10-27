@@ -32,6 +32,7 @@ cache = {}
 
 def run_async(func):
     """Декоратор для запуска асинхронных функций в Flask"""
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         loop = asyncio.new_event_loop()
@@ -41,6 +42,7 @@ def run_async(func):
             return result
         finally:
             loop.close()
+
     return wrapper
 
 
@@ -59,6 +61,40 @@ def get_cache(key: str):
 def set_cache(key: str, value):
     """Установить значение в кэш"""
     cache[key] = (value, time.time())
+
+
+def calculate_support_resistance(klines: list) -> dict:
+    """Расчет уровней поддержки и сопротивления"""
+    try:
+        if not klines or len(klines) < 5:
+            return {}
+
+        # Получаем последние 20 свечей для расчета
+        recent_klines = klines[-20:]
+        closes = [float(k['close']) for k in recent_klines]
+        highs = [float(k['high']) for k in recent_klines]
+        lows = [float(k['low']) for k in recent_klines]
+
+        # Основные уровни
+        resistance = max(highs)
+        support = min(lows)
+        midline = (resistance + support) / 2
+
+        # Дополнительные уровни (на основе расстояния)
+        distance = resistance - support
+        resistance2 = resistance + distance * 0.5
+        support2 = support - distance * 0.5
+
+        return {
+            'resistance2': float(resistance2),
+            'resistance': float(resistance),
+            'midline': float(midline),
+            'support': float(support),
+            'support2': float(support2)
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка расчета уровней: {e}")
+        return {}
 
 
 # ======================== МАРШРУТЫ ========================
@@ -80,7 +116,7 @@ def health_check():
         'status': 'ok',
         'timestamp': datetime.now().isoformat(),
         'api': 'Bybit API v5',
-        'features': ['search', 'ticker', 'klines', 'indicators', 'predictions']
+        'features': ['search', 'ticker', 'klines', 'indicators', 'predictions', 'support_resistance']
     }), 200
 
 
@@ -281,7 +317,7 @@ async def predict_price(symbol: str):
 @app.route('/api/klines/<symbol>', methods=['GET'])
 @run_async
 async def get_klines(symbol: str):
-    """Получение свечей для графика"""
+    """Получение свечей для графика с уровнями поддержки/сопротивления"""
     symbol = symbol.upper()
     if not symbol.endswith('USDT'):
         symbol = f"{symbol}USDT"
@@ -310,12 +346,16 @@ async def get_klines(symbol: str):
                 'volume': float(kline[5])
             })
 
+        # Рассчитываем уровни поддержки и сопротивления
+        levels = calculate_support_resistance(formatted_klines)
+
         return jsonify({
             'success': True,
             'data': formatted_klines,
             'symbol': symbol,
             'interval': interval,
-            'count': len(formatted_klines)
+            'count': len(formatted_klines),
+            'levels': levels
         })
 
     except Exception as e:
@@ -441,6 +481,7 @@ if __name__ == '__main__':
     print(f"📊 Адрес: http://localhost:{port}")
     print(f"🔍 Поиск: Да")
     print(f"📈 График: Да")
+    print(f"📊 Уровни поддержки/сопротивления: Да")
     print(f"🧠 Прогнозы: Да")
     print(f"{'=' * 70}\n")
 

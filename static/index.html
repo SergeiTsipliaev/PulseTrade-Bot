@@ -256,7 +256,29 @@
         }
 
         #priceChart {
-            max-height: 250px;
+            max-height: 300px;
+        }
+
+        /* ======================== СКЕЛЕТОН ЗАГРУЗКИ ======================== */
+        .chart-skeleton {
+            height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .skeleton-line {
+            height: 60px;
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 8px;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
         }
 
         /* ======================== ИНДИКАТОРЫ ======================== */
@@ -290,6 +312,89 @@
             font-size: 22px;
             font-weight: bold;
             color: var(--primary);
+        }
+
+        /* ======================== СКЕЛЕТОН ИНДИКАТОРОВ ======================== */
+        .skeleton-indicator {
+            animation: pulse 2s infinite;
+        }
+
+        .skeleton-label {
+            height: 10px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+
+        .skeleton-value {
+            height: 24px;
+            background: #e0e0e0;
+            border-radius: 4px;
+        }
+
+        .skeleton-text {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* ======================== ИНФОРМАЦИЯ ОБ УРОВНЯХ ======================== */
+        .levels-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }
+
+        .level-item {
+            background: var(--secondary);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            border-left: 4px solid;
+        }
+
+        .level-resistance2 {
+            border-left-color: #ef4444;
+        }
+
+        .level-resistance {
+            border-left-color: #f59e0b;
+        }
+
+        .level-support {
+            border-left-color: #10b981;
+        }
+
+        .level-support2 {
+            border-left-color: #06b6d4;
+        }
+
+        .level-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .level-price {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .level-distance {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
         }
 
         /* ======================== ПРОГНОЗ ======================== */
@@ -487,6 +592,7 @@
         <!-- ГРАФИК -->
         <div class="chart-container" id="chartContainer">
             <canvas id="priceChart"></canvas>
+            <div class="levels-info" id="levelsInfo"></div>
         </div>
 
         <!-- ИНДИКАТОРЫ -->
