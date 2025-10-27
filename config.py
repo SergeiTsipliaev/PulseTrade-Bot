@@ -11,7 +11,7 @@ DB_PORT = os.getenv('DB_PORT', '5432')
 DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # Coinbase API
-COINBASE_API = 'https://api.coinbase.com/v2'
+COINBASE_API = 'https://api-testnet.bybit.com'
 
 # LSTM settings (если будете использовать)
 SEQUENCE_LENGTH = 60

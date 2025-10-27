@@ -24,7 +24,6 @@
         .header {
             text-align: center;
             margin-bottom: 20px;
-            animation: fadeInDown 0.5s ease-out;
         }
 
         .header h1 {
@@ -33,54 +32,10 @@
             margin-bottom: 8px;
         }
 
-        /* АНИМАЦИИ */
-        @keyframes fadeInDown {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes scaleIn {
-            from {
-                opacity: 0;
-                transform: scale(0.9);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.05);
-            }
-        }
-
         /* ПОИСК */
         .search-container {
             position: relative;
             margin-bottom: 20px;
-            animation: fadeInUp 0.5s ease-out 0.1s backwards;
         }
 
         .search-input {
@@ -91,14 +46,11 @@
             font-size: 16px;
             background: var(--tg-theme-secondary-bg-color, #f4f4f5);
             color: var(--tg-theme-text-color, #000000);
-            transition: all 0.3s ease;
         }
 
         .search-input:focus {
             outline: none;
             border-color: var(--tg-theme-button-color, #3390ec);
-            box-shadow: 0 0 0 3px rgba(51, 144, 236, 0.1);
-            transform: translateY(-2px);
         }
 
         .search-results {
@@ -109,12 +61,10 @@
             background: var(--tg-theme-bg-color, #ffffff);
             border: 1px solid var(--tg-theme-hint-color, #999);
             border-radius: 8px;
-            max-height: 300px;
+            max-height: 200px;
             overflow-y: auto;
             z-index: 1000;
             display: none;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            animation: fadeInUp 0.2s ease-out;
         }
 
         .search-result-item {
@@ -124,18 +74,10 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            transition: all 0.2s ease;
         }
 
         .search-result-item:hover {
             background: var(--tg-theme-secondary-bg-color, #f4f4f5);
-            transform: translateX(4px);
-        }
-
-        .search-result-item:active {
-            background: var(--tg-theme-button-color, #3390ec);
-            color: white;
-            transform: scale(0.98);
         }
 
         .crypto-symbol {
@@ -160,19 +102,11 @@
             font-weight: 600;
             cursor: pointer;
             margin-bottom: 20px;
-            transition: all 0.3s ease;
-            animation: fadeInUp 0.5s ease-out 0.2s backwards;
-        }
-
-        .all-cryptos-btn:hover {
-            background: var(--tg-theme-button-color, #3390ec);
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(51, 144, 236, 0.3);
+            transition: all 0.3s;
         }
 
         .all-cryptos-btn:active {
-            transform: scale(0.98) translateY(0);
+            transform: scale(0.98);
         }
 
         /* СЕТКА КРИПТОВАЛЮТ */
@@ -181,7 +115,6 @@
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
             margin-bottom: 24px;
-            animation: fadeInUp 0.5s ease-out 0.3s backwards;
         }
 
         .crypto-card {
@@ -190,38 +123,14 @@
             padding: 16px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s;
             border: 2px solid transparent;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .crypto-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .crypto-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-        }
-
-        .crypto-card:hover::before {
-            opacity: 1;
         }
 
         .crypto-card.active {
             border-color: var(--tg-theme-button-color, #3390ec);
             background: var(--tg-theme-button-color, #3390ec);
             color: white;
-            animation: pulse 0.5s ease;
         }
 
         .crypto-card:active {
@@ -231,23 +140,14 @@
         .crypto-emoji {
             font-size: 32px;
             margin-bottom: 8px;
-            position: relative;
-            z-index: 1;
-            transition: transform 0.3s ease;
-        }
-
-        .crypto-card:hover .crypto-emoji {
-            transform: scale(1.2) rotate(5deg);
         }
 
         .crypto-symbol-small {
             font-size: 12px;
             font-weight: 600;
-            position: relative;
-            z-index: 1;
         }
 
-        /* КАРТОЧКА ЦЕНЫ */
+        /* ОСТАЛЬНЫЕ СТИЛИ (из предыдущей версии) */
         .price-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 16px;
@@ -255,8 +155,6 @@
             color: white;
             margin-bottom: 24px;
             display: none;
-            animation: scaleIn 0.5s ease-out;
-            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
         }
 
         .price-card.show {
@@ -267,32 +165,25 @@
             font-size: 36px;
             font-weight: bold;
             margin: 12px 0;
-            animation: fadeInUp 0.5s ease-out 0.2s backwards;
         }
 
         .price-change {
             font-size: 18px;
             opacity: 0.9;
-            animation: fadeInUp 0.5s ease-out 0.3s backwards;
-            transition: all 0.3s ease;
         }
 
-        /* ГРАФИК */
         .chart-container {
             background: var(--tg-theme-secondary-bg-color, #f4f4f5);
             border-radius: 16px;
             padding: 16px;
             margin-bottom: 24px;
             display: none;
-            animation: scaleIn 0.5s ease-out 0.2s backwards;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
         .chart-container.show {
             display: block;
         }
 
-        /* ИНДИКАТОРЫ */
         .indicators-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -304,18 +195,6 @@
             background: var(--tg-theme-secondary-bg-color, #f4f4f5);
             border-radius: 12px;
             padding: 16px;
-            transition: all 0.3s ease;
-            animation: scaleIn 0.5s ease-out backwards;
-        }
-
-        .indicator-card:nth-child(1) { animation-delay: 0.1s; }
-        .indicator-card:nth-child(2) { animation-delay: 0.2s; }
-        .indicator-card:nth-child(3) { animation-delay: 0.3s; }
-        .indicator-card:nth-child(4) { animation-delay: 0.4s; }
-
-        .indicator-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
         }
 
         .indicator-label {
@@ -329,10 +208,8 @@
             font-weight: bold;
         }
 
-        /* ПРОГНОЗ */
         .prediction-section {
             display: none;
-            animation: fadeInUp 0.5s ease-out;
         }
 
         .prediction-section.show {
@@ -345,14 +222,11 @@
             padding: 24px;
             text-align: center;
             margin-bottom: 16px;
-            animation: scaleIn 0.5s ease-out;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
         .signal {
             font-size: 48px;
             margin-bottom: 12px;
-            animation: pulse 1s ease-in-out infinite;
         }
 
         .signal-text {
@@ -388,7 +262,6 @@
             font-weight: bold;
         }
 
-        /* КНОПКИ */
         .btn {
             width: 100%;
             padding: 16px;
@@ -397,53 +270,25 @@
             font-weight: 600;
             border: none;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s;
             margin-top: 12px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
-            transform: translate(-50%, -50%);
-            transition: width 0.6s, height 0.6s;
-        }
-
-        .btn:active::before {
-            width: 300px;
-            height: 300px;
         }
 
         .btn-primary {
             background: var(--tg-theme-button-color, #3390ec);
             color: var(--tg-theme-button-text-color, #ffffff);
-            box-shadow: 0 4px 12px rgba(51, 144, 236, 0.3);
-            animation: fadeInUp 0.5s ease-out;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(51, 144, 236, 0.4);
         }
 
         .btn-primary:active {
-            transform: scale(0.98) translateY(0);
+            opacity: 0.8;
+            transform: scale(0.98);
         }
 
         .btn-primary:disabled {
             opacity: 0.5;
             cursor: not-allowed;
-            transform: none;
         }
 
-        /* ЗАГРУЗКА */
         .loading {
             text-align: center;
             padding: 40px;
@@ -473,10 +318,9 @@
             font-size: 18px;
             font-weight: bold;
             margin-bottom: 16px;
-            animation: fadeInUp 0.5s ease-out;
         }
 
-        /* МОДАЛЬНОЕ ОКНО */
+        /* МОДАЛЬНОЕ ОКНО ВСЕХ КРИПТОВАЛЮТ */
         .modal {
             display: none;
             position: fixed;
@@ -487,12 +331,6 @@
             background: rgba(0, 0, 0, 0.5);
             z-index: 2000;
             padding: 20px;
-            animation: fadeIn 0.3s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
         }
 
         .modal.show {
@@ -509,8 +347,6 @@
             width: 100%;
             max-height: 80vh;
             overflow-y: auto;
-            animation: scaleIn 0.3s ease-out;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
         .modal-header {
@@ -528,25 +364,9 @@
         .close-modal {
             background: none;
             border: none;
-            font-size: 28px;
+            font-size: 24px;
             cursor: pointer;
             color: var(--tg-theme-text-color, #000000);
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: all 0.3s ease;
-        }
-
-        .close-modal:hover {
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
-            transform: rotate(90deg);
-        }
-
-        .close-modal:active {
-            transform: scale(0.9) rotate(90deg);
         }
 
         .crypto-list {
@@ -563,12 +383,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            transition: all 0.3s ease;
-        }
-
-        .crypto-list-item:hover {
-            transform: translateX(4px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
         }
 
         .crypto-list-item:active {
@@ -598,7 +413,7 @@
             📋 Показать все криптовалюты
         </button>
 
-        <!-- МОДАЛЬНОЕ ОКНО -->
+        <!-- МОДАЛЬНОЕ ОКНО ВСЕХ КРИПТОВАЛЮТ -->
         <div class="modal" id="allCryptosModal">
             <div class="modal-content">
                 <div class="modal-header">
@@ -609,52 +424,51 @@
             </div>
         </div>
 
-        <!-- ПОПУЛЯРНЫЕ КРИПТОВАЛЮТЫ -->
+        <!-- ОСТАЛЬНАЯ ЧАСТЬ ИНТЕРФЕЙСА -->
         <div class="section-title">Популярные криптовалюты</div>
         <div class="crypto-grid" id="cryptoGrid"></div>
 
-        <!-- КАРТОЧКА ЦЕНЫ -->
         <div class="price-card" id="priceCard">
             <div id="cryptoName"></div>
             <div class="price-main" id="currentPrice"></div>
             <div class="price-change" id="priceChange"></div>
         </div>
 
-        <!-- ГРАФИК -->
         <div class="chart-container" id="chartContainer">
             <canvas id="priceChart"></canvas>
         </div>
 
-        <!-- ИНДИКАТОРЫ -->
         <div id="indicatorsSection" class="hidden">
             <div class="section-title">📊 Технический анализ</div>
             <div class="indicators-grid" id="indicatorsGrid"></div>
         </div>
 
-        <!-- КНОПКА ПРОГНОЗА -->
         <button class="btn btn-primary hidden" id="predictBtn">
             🔮 Сделать прогноз LSTM
         </button>
 
-        <!-- ПРОГНОЗ -->
         <div class="prediction-section" id="predictionSection">
             <div class="section-title">🔮 Прогноз на 7 дней</div>
             <div class="prediction-card">
                 <div class="signal" id="signalEmoji"></div>
                 <div class="signal-text" id="signalText"></div>
                 <div class="predicted-change" id="predictedChange"></div>
+                <div class="metrics">
+                    <div class="metric-item">
+                        <div class="metric-label">Точность</div>
+                        <div class="metric-value" id="accuracy"></div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">RMSE</div>
+                        <div class="metric-value" id="rmse"></div>
+                    </div>
+                </div>
             </div>
-
-            <!-- НОВАЯ СЕТКА МЕТРИК С ЦИФРАМИ -->
-            <div class="section-title" style="margin-top: 24px;">📊 Детали прогноза</div>
-            <div class="metrics-grid" id="metricsGrid"></div>
-
             <div class="chart-container show">
                 <canvas id="predictionChart"></canvas>
             </div>
         </div>
 
-        <!-- ЗАГРУЗКА -->
         <div class="loading hidden" id="loading">
             <div class="spinner"></div>
             <div id="loadingText">Загрузка данных...</div>
