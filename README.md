@@ -89,12 +89,21 @@ PulseTrade-Bot/
 │   ├── __init__.py
 │   ├── handlers.py          # Обработчики команд
 │   └── main.py              # Запуск бота
+├── models/
+│   ├── __init__.py
+│   ├── database.py  
+│   └── lstm_model.py  
+├── scripts/
+│   ├── __init__.py
+│   ├── init_database.py 
 ├── static/
 │   ├── index.html           # Mini App UI
 │   └── app.js               # JavaScript логика
+│   └── __init__.py
 ├── services/
 │   ├── __init__.py
 │   └── crypto_service.py    # Сервис работы с API
+│   └── coinbase_service.py 
 ├── config.py                # Конфигурация
 ├── requirements.txt         # Зависимости Python
 ├── runtime.txt              # Python версия (3.10.11)

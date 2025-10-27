@@ -1,41 +1,36 @@
 import os
+from dotenv import load_dotenv
 
-# Database settings
-DB_HOST = os.getenv('DB_HOST', 'localhost')
-DB_NAME = os.getenv('DB_NAME', 'cryptobot')
-DB_USER = os.getenv('DB_USER', 'postgres')
-DB_PASSWORD = os.getenv('DB_PASSWORD', 'password')
-DB_PORT = os.getenv('DB_PORT', '5432')
+load_dotenv()
 
-# Database URL for SQLAlchemy
-DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-# Coinbase API
-COINBASE_API = 'https://api-testnet.bybit.com'
+class BybitConfig:
+    API_KEY = os.getenv('BYBIT_API_KEY')
+    API_SECRET = os.getenv('BYBIT_API_SECRET')
+    BASE_URL = os.getenv('BYBIT_BASE_URL', 'https://api.bybit.com')
+    WS_URL = os.getenv('BYBIT_WS_URL', 'wss://stream.bybit.com/v5/public/spot')
+    WS_PRIVATE_URL = os.getenv('BYBIT_WS_PRIVATE_URL', 'wss://stream.bybit.com/v5/private')
 
-# LSTM settings (если будете использовать)
-SEQUENCE_LENGTH = 60
-PREDICTION_DAYS = 7
-EPOCHS = 50
-BATCH_SIZE = 32
+    TESTNET = os.getenv('BYBIT_TESTNET', 'true').lower() == 'true'
 
-# Bot settings
-BOT_TOKEN = os.getenv('BOT_TOKEN', '')
-WEB_APP_URL = os.getenv('WEB_APP_URL', '')
+    if TESTNET:
+        BASE_URL = 'https://api-testnet.bybit.com'
+        WS_URL = 'wss://stream-testnet.bybit.com/v5/public/spot'
+        WS_PRIVATE_URL = 'wss://stream-testnet.bybit.com/v5/private'
 
-# Cache settings
-CACHE_TTL = 60  # seconds
 
-# Popular cryptocurrencies for default display
-POPULAR_CRYPTOS = {
-    'BTC': {'symbol': 'BTC', 'name': 'Bitcoin'},
-    'ETH': {'symbol': 'ETH', 'name': 'Ethereum'},
-    'BNB': {'symbol': 'BNB', 'name': 'Binance Coin'},
-    'SOL': {'symbol': 'SOL', 'name': 'Solana'},
-    'XRP': {'symbol': 'XRP', 'name': 'Ripple'},
-    'ADA': {'symbol': 'ADA', 'name': 'Cardano'},
-    'DOGE': {'symbol': 'DOGE', 'name': 'Dogecoin'},
-    'DOT': {'symbol': 'DOT', 'name': 'Polkadot'},
-    'LTC': {'symbol': 'LTC', 'name': 'Litecoin'},
-    'MATIC': {'symbol': 'MATIC', 'name': 'Polygon'}
-}
+class TelegramConfig:
+    BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+
+
+class TradingConfig:
+    DEFAULT_SYMBOL = os.getenv('DEFAULT_SYMBOL', 'BTCUSDT')
+    LEVERAGE = int(os.getenv('LEVERAGE', '10'))
+    RISK_PERCENT = float(os.getenv('RISK_PERCENT', '1.0'))
+    UPDATE_INTERVAL = int(os.getenv('UPDATE_INTERVAL', '1'))
+
+
+class ModelConfig:
+    SEQUENCE_LENGTH = int(os.getenv('SEQUENCE_LENGTH', '60'))
+    TRAINING_EPOCHS = int(os.getenv('TRAINING_EPOCHS', '50'))
+    PREDICTION_DAYS = int(os.getenv('PREDICTION_DAYS', '7'))
