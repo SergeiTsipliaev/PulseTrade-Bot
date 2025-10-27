@@ -7,7 +7,7 @@ print("🧪 Тестирование импортов...")
 sys.path.insert(0, os.path.abspath('.'))
 
 try:
-    from services.coinbase_service import coinbase_service
+    from services.bybit_service import BybitServise
     print("✅ services.coinbase_service - OK")
 except ImportError as e:
     print(f"❌ services.coinbase_service - {e}")

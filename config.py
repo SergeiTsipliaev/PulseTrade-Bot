@@ -1,42 +1,31 @@
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
+# Coinbase API (10,000 requests/hour - бесплатно!)
+COINBASE_API = 'https://api.coinbase.com/v2'
 
+# Mapping crypto IDs
+COINBASE_SYMBOLS = {
+    'bitcoin': 'BTC',
+    'ethereum': 'ETH',
+    'binancecoin': 'BNB',
+    'solana': 'SOL',
+    'ripple': 'XRP'
+}
 
-class BybitConfig:
-    API_KEY = os.getenv('BYBIT_API_KEY')
-    API_SECRET = os.getenv('BYBIT_API_SECRET')
-    BASE_URL = os.getenv('BYBIT_BASE_URL', 'https://api.bybit.com')
-    WS_URL = os.getenv('BYBIT_WS_URL', 'wss://stream.bybit.com/v5/public/spot')
-    WS_PRIVATE_URL = os.getenv('BYBIT_WS_PRIVATE_URL', 'wss://stream.bybit.com/v5/private')
+# LSTM settings
+SEQUENCE_LENGTH = 60
+PREDICTION_DAYS = 7
+EPOCHS = 50
+BATCH_SIZE = 32
 
-    TESTNET = os.getenv('BYBIT_TESTNET', 'true').lower() == 'true'
+CRYPTOS = {
+    'bitcoin': {'id': 'bitcoin', 'symbol': 'BTC', 'name': 'Bitcoin'},
+    'ethereum': {'id': 'ethereum', 'symbol': 'ETH', 'name': 'Ethereum'},
+    'binancecoin': {'id': 'binancecoin', 'symbol': 'BNB', 'name': 'BNB'},
+    'solana': {'id': 'solana', 'symbol': 'SOL', 'name': 'Solana'},
+    'ripple': {'id': 'ripple', 'symbol': 'XRP', 'name': 'XRP'},
+}
 
-    if TESTNET:
-        BASE_URL = 'https://api-testnet.bybit.com'
-        WS_URL = 'wss://stream-testnet.bybit.com/v5/public/spot'
-        WS_PRIVATE_URL = 'wss://stream-testnet.bybit.com/v5/private'
-
-
-class TelegramConfig:
-    BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-
-
-class TradingConfig:
-    DEFAULT_SYMBOL = os.getenv('DEFAULT_SYMBOL', 'BTCUSDT')
-    LEVERAGE = int(os.getenv('LEVERAGE', '10'))
-    RISK_PERCENT = float(os.getenv('RISK_PERCENT', '1.0'))
-    UPDATE_INTERVAL = int(os.getenv('UPDATE_INTERVAL', '1'))
-
-
-class ModelConfig:
-    SEQUENCE_LENGTH = int(os.getenv('SEQUENCE_LENGTH', '60'))
-    TRAINING_EPOCHS = int(os.getenv('TRAINING_EPOCHS', '50'))
-    PREDICTION_DAYS = int(os.getenv('PREDICTION_DAYS', '7'))
-
-
-class WebConfig:
-    HOST = os.getenv('WEB_HOST', '127.0.0.1')
-    PORT = int(os.getenv('WEB_PORT', '5000'))
-    DEBUG = os.getenv('WEB_DEBUG', 'false').lower() == 'true'
+# Bot settings
+BOT_TOKEN = os.getenv('BOT_TOKEN', '')
+WEB_APP_URL = os.getenv('WEB_APP_URL', '')

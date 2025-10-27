@@ -16,9 +16,9 @@ from models.database import db
 logger = logging.getLogger(__name__)
 
 
-class CoinbaseService:
+class BybitService:
     def __init__(self):
-        self.base_url = "https://api.coinbase.com/v2"
+        self.base_url = "https://api.bybit.com"
         self.timeout = aiohttp.ClientTimeout(total=10)
 
     def create_ssl_context(self):
@@ -50,7 +50,7 @@ class CoinbaseService:
             return None
 
     async def search_currencies(self, query):
-        """Асинхронный поиск криптовалют через Coinbase API"""
+        """Поиск криптовалют через Coinbase API"""
         ssl_context = self.create_ssl_context()
         connector = aiohttp.TCPConnector(ssl=ssl_context)
 
@@ -81,14 +81,14 @@ class CoinbaseService:
                     )
 
                 logger.info(f"🔍 Найдено {len(filtered)} криптовалют для запроса '{query}'")
-                return filtered[:10]
+                return filtered[:10]  # Возвращаем топ-10 результатов
 
             except Exception as e:
                 logger.error(f"❌ Ошибка поиска в Coinbase: {e}")
                 return []
 
     async def get_currency_price(self, currency_id):
-        """Асинхронное получение цены криптовалюты"""
+        """Получение цены криптовалюты"""
         ssl_context = self.create_ssl_context()
         connector = aiohttp.TCPConnector(ssl=ssl_context)
 
@@ -119,4 +119,4 @@ class CoinbaseService:
 
 
 # Глобальный экземпляр сервиса
-coinbase_service = CoinbaseService()
+BybitServise = BybitService()
