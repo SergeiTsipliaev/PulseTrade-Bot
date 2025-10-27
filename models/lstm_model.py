@@ -35,11 +35,9 @@ class LSTMPredictor:
 
     async def prepare_data(self, prices: List[float]) -> Tuple[np.ndarray, np.ndarray]:
         """Подготовка данных для обучения"""
-        # Нормализация данных
         prices_array = np.array(prices).reshape(-1, 1)
         scaled_data = self.scaler.fit_transform(prices_array)
 
-        # Создание последовательностей
         X, y = [], []
         for i in range(self.sequence_length, len(scaled_data)):
             X.append(scaled_data[i - self.sequence_length:i, 0])
@@ -52,18 +50,13 @@ class LSTMPredictor:
         if len(prices) < self.sequence_length + 100:
             raise ValueError(f"Need at least {self.sequence_length + 100} data points for training")
 
-        # Подготовка данных
         X, y = await self.prepare_data(prices)
-
-        # Reshape данных для LSTM
         X = X.reshape(X.shape[0], X.shape[1], 1)
 
-        # Разделение на train/test
         split = int(0.8 * len(X))
         X_train, X_test = X[:split], X[split:]
         y_train, y_test = y[:split], y[split:]
 
-        # Создание и обучение модели
         self.model = self.create_model((X.shape[1], 1))
 
         history = self.model.fit(
@@ -78,8 +71,7 @@ class LSTMPredictor:
 
         return {
             'train_loss': history.history['loss'][-1],
-            'val_loss': history.history['val_loss'][-1],
-            'epochs': len(history.history['loss'])
+            'val_loss': history.history['val_loss'][-1]
         }
 
     async def predict(self, prices: List[float], future_steps: int = 10) -> List[float]:
@@ -87,7 +79,6 @@ class LSTMPredictor:
         if not self.is_trained or self.model is None:
             raise ValueError("Model not trained")
 
-        # Используем последние sequence_length цен для прогноза
         last_sequence = prices[-self.sequence_length:]
         scaled_sequence = self.scaler.transform(np.array(last_sequence).reshape(-1, 1))
 
@@ -95,60 +86,54 @@ class LSTMPredictor:
         current_sequence = scaled_sequence.reshape(1, self.sequence_length, 1)
 
         for _ in range(future_steps):
-            # Прогноз следующего значения
             next_pred = self.model.predict(current_sequence, verbose=0)
             predictions.append(float(next_pred[0, 0]))
-
-            # Обновление последовательности
             current_sequence = np.append(current_sequence[:, 1:, :], next_pred.reshape(1, 1, 1), axis=1)
 
-        # Обратное преобразование к нормальным ценам
         predictions = self.scaler.inverse_transform(np.array(predictions).reshape(-1, 1))
         return [float(p[0]) for p in predictions]
 
-    async def save_model(self, symbol: str, directory: str = "data/models"):
-        """Сохранение модели"""
-        if not self.is_trained or self.model is None:
-            raise ValueError("No model to save")
+    async def get_price_prediction(self, symbol: str, historical_data: List[float], days: int = 7) -> dict:
+        """Полный процесс прогнозирования для символа"""
+        try:
+            # Обучение или загрузка модели
+            if not self.is_trained:
+                await self.train(historical_data)
 
-        os.makedirs(directory, exist_ok=True)
-        model_path = os.path.join(directory, f"{symbol}_lstm.h5")
-        scaler_path = os.path.join(directory, f"{symbol}_scaler.json")
+            # Прогнозирование
+            predictions = await self.predict(historical_data, days)
+            current_price = historical_data[-1]
 
-        # Сохранение модели
-        self.model.save(model_path)
+            # Расчет изменений
+            price_changes = []
+            for i, pred_price in enumerate(predictions):
+                change = ((pred_price - current_price) / current_price) * 100
+                price_changes.append({
+                    'day': i + 1,
+                    'predicted_price': pred_price,
+                    'change_percent': change
+                })
 
-        # Сохранение scaler
-        scaler_data = {
-            'min_': self.scaler.min_.tolist(),
-            'scale_': self.scaler.scale_.tolist(),
-            'data_min_': self.scaler.data_min_.tolist(),
-            'data_max_': self.scaler.data_max_.tolist(),
-            'data_range_': self.scaler.data_range_.tolist()
-        }
+            # Рекомендация
+            avg_change = sum(p['change_percent'] for p in price_changes) / len(price_changes)
 
-        with open(scaler_path, 'w') as f:
-            json.dump(scaler_data, f)
+            if avg_change > 2:
+                recommendation = "STRONG_BUY"
+            elif avg_change > 0:
+                recommendation = "BUY"
+            elif avg_change > -2:
+                recommendation = "HOLD"
+            else:
+                recommendation = "SELL"
 
-    async def load_model(self, symbol: str, directory: str = "data/models"):
-        """Загрузка модели"""
-        model_path = os.path.join(directory, f"{symbol}_lstm.h5")
-        scaler_path = os.path.join(directory, f"{symbol}_scaler.json")
+            return {
+                'symbol': symbol,
+                'current_price': current_price,
+                'predictions': price_changes,
+                'average_change_percent': avg_change,
+                'recommendation': recommendation,
+                'confidence': min(95, 100 - abs(avg_change) * 2)
+            }
 
-        if not os.path.exists(model_path) or not os.path.exists(scaler_path):
-            raise FileNotFoundError(f"Model for {symbol} not found")
-
-        # Загрузка модели
-        self.model = load_model(model_path)
-
-        # Загрузка scaler
-        with open(scaler_path, 'r') as f:
-            scaler_data = json.load(f)
-
-        self.scaler.min_ = np.array(scaler_data['min_'])
-        self.scaler.scale_ = np.array(scaler_data['scale_'])
-        self.scaler.data_min_ = np.array(scaler_data['data_min_'])
-        self.scaler.data_max_ = np.array(scaler_data['data_max_'])
-        self.scaler.data_range_ = np.array(scaler_data['data_range_'])
-
-        self.is_trained = True
+        except Exception as e:
+            raise Exception(f"Prediction error: {str(e)}")

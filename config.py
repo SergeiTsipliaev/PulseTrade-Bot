@@ -34,3 +34,9 @@ class ModelConfig:
     SEQUENCE_LENGTH = int(os.getenv('SEQUENCE_LENGTH', '60'))
     TRAINING_EPOCHS = int(os.getenv('TRAINING_EPOCHS', '50'))
     PREDICTION_DAYS = int(os.getenv('PREDICTION_DAYS', '7'))
+
+
+class WebConfig:
+    HOST = os.getenv('WEB_HOST', '127.0.0.1')
+    PORT = int(os.getenv('WEB_PORT', '5000'))
+    DEBUG = os.getenv('WEB_DEBUG', 'false').lower() == 'true'
