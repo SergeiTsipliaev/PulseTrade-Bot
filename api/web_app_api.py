@@ -19,8 +19,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Инициализация Flask
-app = Flask(__name__, static_folder='static', static_url_path='')
+# Инициализация Flask - ИСПРАВЛЕНО: добавлен ../ для static_folder
+app = Flask(__name__, static_folder='../static', static_url_path='')
 app.secret_key = SECRET_KEY
 CORS(app)
 
