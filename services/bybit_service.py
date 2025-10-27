@@ -14,10 +14,8 @@ class BybitService:
     def __init__(self):
         self.base_url = "https://api.bybit.com"
         self.timeout = aiohttp.ClientTimeout(total=30)
-        logger.info("✅ BybitService инициализирован")
 
     async def create_session(self):
-        """ВАЖНО: Создаем НОВУЮ сессию для КАЖДОГО запроса"""
         ssl_context = ssl.create_default_context()
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
@@ -31,94 +29,47 @@ class BybitService:
         connector = aiohttp.TCPConnector(
             ssl=ssl_context,
             limit=10,
-            force_close=True,  # ВАЖНО: Закрываем соединения после использования
+            force_close=True,
             enable_cleanup_closed=True
         )
 
-        # trust_env=True позволяет использовать системный VPN
         session = aiohttp.ClientSession(
             connector=connector,
             timeout=self.timeout,
             headers=headers,
-            trust_env=True  # ВАЖНО: Используем системные настройки (VPN)
+            trust_env=True
         )
 
         return session
 
     async def fetch_url(self, url: str, params: dict = None) -> Optional[dict]:
-        """Запрос с НОВОЙ сессией каждый раз"""
-        logger.info(f"🌐 Запрос: {url}")
-        logger.info(f"📝 Параметры: {params}")
-
-        # Создаем новую сессию для каждого запроса
         session = await self.create_session()
 
         try:
-            for attempt in range(3):
-                try:
-                    logger.info(f"🔄 Попытка {attempt + 1}/3")
+            async with session.get(url, params=params, allow_redirects=False) as response:
+                if response.status == 200:
+                    content_type = response.headers.get('Content-Type', '')
 
-                    async with session.get(url, params=params, allow_redirects=False) as response:
-                        logger.info(f"📡 Статус: {response.status}")
+                    if 'application/json' not in content_type:
+                        return None
 
-                        if response.status in [301, 302, 303, 307, 308]:
-                            redirect = response.headers.get('Location', '')
-                            logger.error(f"❌ Редирект: {redirect}")
+                    data = await response.json()
 
-                            if 'prohibited' in redirect.lower():
-                                logger.error(f"❌ VPN не работает или отключился!")
-                                return None
+                    if data.get('retCode') == 0:
+                        return data.get('result')
+                    else:
+                        return None
+                else:
+                    return None
 
-                            await asyncio.sleep(2)
-                            continue
-
-                        if response.status == 200:
-                            content_type = response.headers.get('Content-Type', '')
-
-                            if 'application/json' not in content_type:
-                                logger.error(f"❌ Не JSON: {content_type}")
-                                await asyncio.sleep(2)
-                                continue
-
-                            data = await response.json()
-
-                            if data.get('retCode') == 0:
-                                logger.info(f"✅ Успех!")
-                                return data.get('result')
-                            else:
-                                logger.error(f"❌ Bybit error: {data.get('retMsg')}")
-                                return None
-                        else:
-                            logger.error(f"❌ HTTP {response.status}")
-                            await asyncio.sleep(2)
-                            continue
-
-                except aiohttp.ClientError as e:
-                    logger.error(f"❌ Ошибка клиента (попытка {attempt + 1}/3): {e}")
-                    await asyncio.sleep(2)
-                    continue
-
-                except asyncio.TimeoutError:
-                    logger.error(f"⏱️ Таймаут (попытка {attempt + 1}/3)")
-                    await asyncio.sleep(2)
-                    continue
-
-                except Exception as e:
-                    logger.error(f"❌ Неожиданная ошибка (попытка {attempt + 1}/3): {e}")
-                    await asyncio.sleep(2)
-                    continue
-
-            logger.error(f"❌ Все попытки исчерпаны")
+        except Exception as e:
+            logger.error(f"Error: {e}")
             return None
 
         finally:
-            # ВАЖНО: Закрываем сессию после использования
             await session.close()
-            logger.info(f"🔒 Сессия закрыта")
 
     async def search_cryptocurrencies(self, query: str) -> List[Dict]:
-        logger.info(f"🔍 Поиск: '{query}'")
-
         try:
             url = f"{self.base_url}/v5/market/instruments-info"
             result = await self.fetch_url(url, {"category": "spot"})
@@ -145,16 +96,13 @@ class BybitService:
                         'emoji': '💰'
                     })
 
-            logger.info(f"✅ Найдено: {len(filtered[:20])}")
             return filtered[:20]
 
         except Exception as e:
-            logger.error(f"❌ Ошибка поиска: {e}")
+            logger.error(f"Error: {e}")
             return []
 
     async def get_current_price(self, symbol: str) -> Optional[Dict]:
-        logger.info(f"💰 Получение цены: {symbol}")
-
         try:
             url = f"{self.base_url}/v5/market/tickers"
             result = await self.fetch_url(url, {"category": "spot", "symbol": symbol})
@@ -164,8 +112,6 @@ class BybitService:
                 last_price = float(ticker.get('lastPrice', 0))
                 prev_price_24h = float(ticker.get('prevPrice24h', last_price))
                 change_24h = ((last_price - prev_price_24h) / prev_price_24h) * 100 if prev_price_24h > 0 else 0
-
-                logger.info(f"✅ Цена {symbol}: ${last_price}")
 
                 return {
                     'last_price': last_price,
@@ -179,12 +125,10 @@ class BybitService:
             return None
 
         except Exception as e:
-            logger.error(f"❌ Ошибка получения цены: {e}")
+            logger.error(f"Error: {e}")
             return None
 
     async def get_price_history(self, symbol: str, days: int = 90) -> Optional[Dict]:
-        logger.info(f"📊 История: {symbol} за {days} дней")
-
         try:
             url = f"{self.base_url}/v5/market/kline"
             result = await self.fetch_url(url, {
@@ -198,8 +142,6 @@ class BybitService:
                 klines = result['list']
                 klines.reverse()
 
-                logger.info(f"✅ Получено {len(klines)} свечей")
-
                 return {
                     'prices': [float(k[4]) for k in klines],
                     'timestamps': [int(k[0]) for k in klines]
@@ -208,7 +150,7 @@ class BybitService:
             return None
 
         except Exception as e:
-            logger.error(f"❌ Ошибка истории: {e}")
+            logger.error(f"Error: {e}")
             return None
 
     async def get_kline_data(self, symbol: str, interval: str = "60", limit: int = 200) -> Optional[List]:
@@ -222,7 +164,7 @@ class BybitService:
             })
             return result.get('list') if result else None
         except Exception as e:
-            logger.error(f"❌ Ошибка получения свечей: {e}")
+            logger.error(f"Error: {e}")
             return None
 
     async def calculate_technical_indicators(self, prices: List[float]) -> Dict:
@@ -246,7 +188,7 @@ class BybitService:
                 'trend_strength': float(trend_strength)
             }
         except Exception as e:
-            logger.error(f"❌ Ошибка расчета индикаторов: {e}")
+            logger.error(f"Error: {e}")
             return {'rsi': 50.0, 'ma_7': 0.0, 'ma_25': 0.0, 'ma_50': 0.0, 'volatility': 0.0, 'trend_strength': 0.0}
 
     def _calculate_rsi(self, prices: np.ndarray, period: int = 14) -> float:
@@ -266,4 +208,3 @@ class BybitService:
 
 
 bybit_service = BybitService()
-logger.info("🚀 bybit_service создан")

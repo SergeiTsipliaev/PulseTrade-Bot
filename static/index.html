@@ -335,6 +335,90 @@
             color: var(--danger);
         }
 
+        .prediction-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin: 16px 0;
+            padding: 16px 0;
+            border-top: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .detail-item {
+            text-align: center;
+        }
+
+        .detail-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .detail-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .action-section {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin: 16px 0;
+            padding: 16px;
+            background: white;
+            border: 2px solid var(--secondary);
+            border-radius: 12px;
+        }
+
+        .action-item {
+            text-align: center;
+        }
+
+        .action-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .action-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .confidence-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444, #f59e0b, #10b981);
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .confidence-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
         .metrics {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -501,13 +585,39 @@
                 <div class="signal-emoji" id="signalEmoji"></div>
                 <div class="signal-text" id="signalText"></div>
                 <div class="predicted-change" id="predictedChange"></div>
+
+                <div class="prediction-details">
+                    <div class="detail-item">
+                        <div class="detail-label">Ожидаемая цена</div>
+                        <div class="detail-value" id="expectedPrice">$0.00</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Поддержка</div>
+                        <div class="detail-value" id="support">$0.00</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Сопротивление</div>
+                        <div class="detail-value" id="resistance">$0.00</div>
+                    </div>
+                </div>
+
+                <div class="action-section">
+                    <div class="action-item">
+                        <div class="action-label">Рекомендация</div>
+                        <div class="action-value" id="actionValue"></div>
+                    </div>
+                    <div class="action-item">
+                        <div class="confidence-label">Уверенность</div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" id="confidenceFill"></div>
+                        </div>
+                        <div class="confidence-value" id="confidence">0%</div>
+                    </div>
+                </div>
+
                 <div class="metrics">
                     <div class="metric-item">
-                        <div class="metric-label">Точность</div>
-                        <div class="metric-value" id="accuracy">--</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">RMSE</div>
+                        <div class="metric-label">RMSE (Погрешность)</div>
                         <div class="metric-value" id="rmse">--</div>
                     </div>
                 </div>

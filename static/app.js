@@ -9,7 +9,6 @@ let currentCryptoData = null;
 // ======================== ИНИЦИАЛИЗАЦИЯ ========================
 
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 Приложение загружается...');
     await init();
 });
 
@@ -18,10 +17,9 @@ async function init() {
         await renderCryptoGrid();
         setupEventListeners();
         setupSearch();
-        console.log('✅ Приложение готово');
     } catch (error) {
-        console.error('❌ Ошибка инициализации:', error);
-        showError('Ошибка при загрузке приложения');
+        console.error('Error:', error);
+        showError('Error loading app');
     }
 }
 
@@ -41,7 +39,7 @@ function setupSearch() {
             return;
         }
 
-        searchResults.innerHTML = '<div class="search-result-item">🔍 Поиск...</div>';
+        searchResults.innerHTML = '<div class="search-result-item">🔍 Searching...</div>';
         searchResults.classList.add('show');
 
         searchTimeout = setTimeout(() => {
@@ -62,18 +60,17 @@ async function performSearch(query) {
     const searchResults = document.getElementById('searchResults');
 
     try {
-        console.log(`🔍 Поиск: ${query}`);
         const response = await fetch(`${API_URL}/search?q=${encodeURIComponent(query)}`);
         const data = await response.json();
 
         if (data.success && data.data.length > 0) {
             displaySearchResults(data.data);
         } else {
-            searchResults.innerHTML = '<div class="search-result-item">❌ Не найдено</div>';
+            searchResults.innerHTML = '<div class="search-result-item">Not found</div>';
         }
     } catch (error) {
-        console.error('❌ Ошибка поиска:', error);
-        searchResults.innerHTML = '<div class="search-result-item">⚠️ Ошибка поиска</div>';
+        console.error('Error:', error);
+        searchResults.innerHTML = '<div class="search-result-item">Search error</div>';
     }
 }
 
@@ -95,7 +92,7 @@ async function selectCryptoFromSearch(symbol) {
     document.getElementById('searchResults').classList.remove('show');
     document.getElementById('searchInput').value = '';
 
-    showLoading('Загрузка данных...');
+    showLoading('Loading...');
     await loadCryptoData(symbol);
 }
 
@@ -118,7 +115,7 @@ async function renderCryptoGrid() {
                 card.onclick = () => {
                     selectedCrypto = crypto.symbol;
                     updateCryptoGrid();
-                    showLoading('Загрузка данных...');
+                    showLoading('Loading...');
                     loadCryptoData(crypto.symbol);
                 };
 
@@ -131,7 +128,7 @@ async function renderCryptoGrid() {
             });
         }
     } catch (error) {
-        console.error('❌ Ошибка загрузки сетки:', error);
+        console.error('Error:', error);
     }
 }
 
@@ -153,7 +150,6 @@ function updateCryptoGrid() {
 // ======================== ЗАГРУЗКА ДАННЫХ ========================
 
 async function loadCryptoData(symbol) {
-    console.log(`📊 Загрузка данных для: ${symbol}`);
     selectedCrypto = symbol;
     updateCryptoGrid();
 
@@ -166,19 +162,17 @@ async function loadCryptoData(symbol) {
             displayCryptoData(data.data);
             document.getElementById('predictBtn').classList.remove('hidden');
         } else {
-            showError('Ошибка загрузки данных: ' + (data.error || 'Неизвестная ошибка'));
+            showError('Error: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
-        console.error('❌ Ошибка:', error);
-        showError('Ошибка подключения к серверу');
+        console.error('Error:', error);
+        showError('Connection error');
     } finally {
         hideLoading();
     }
 }
 
 function displayCryptoData(data) {
-    console.log(`🎯 Отображение данных для: ${data.symbol}`);
-
     const priceCard = document.getElementById('priceCard');
     priceCard.classList.add('show');
 
@@ -200,8 +194,6 @@ function displayCryptoData(data) {
     document.getElementById('low24h').textContent = `$${formatPrice(data.current.low_24h)}`;
 
     displayPriceChart(data.history);
-
-    console.log(`✅ Данные отображены`);
 }
 
 // ======================== ГРАФИК ЦЕНЫ ========================
@@ -226,7 +218,7 @@ function displayPriceChart(history) {
         data: {
             labels: labels,
             datasets: [{
-                label: 'Цена (USDT)',
+                label: 'Price (USDT)',
                 data: history.prices,
                 borderColor: '#667eea',
                 backgroundColor: 'rgba(102, 126, 234, 0.1)',
@@ -258,7 +250,7 @@ function displayPriceChart(history) {
                     cornerRadius: 8,
                     callbacks: {
                         label: (context) => {
-                            return `Цена: $${formatPrice(context.parsed.y)}`;
+                            return `Price: $${formatPrice(context.parsed.y)}`;
                         }
                     }
                 }
@@ -286,15 +278,15 @@ function displayPriceChart(history) {
 
 async function makePrediction() {
     if (!selectedCrypto) {
-        showError('Сначала выберите криптовалюту');
+        showError('Select crypto first');
         return;
     }
 
     const btn = document.getElementById('predictBtn');
     btn.disabled = true;
-    btn.textContent = '🧠 Обучение...';
+    btn.textContent = '🧠 Learning...';
 
-    showLoading('Обучение нейросети...');
+    showLoading('Processing...');
 
     try {
         const response = await fetch(`${API_URL}/predict/${selectedCrypto}`, {
@@ -307,15 +299,15 @@ async function makePrediction() {
         if (data.success) {
             displayPrediction(data.data);
         } else {
-            showError('Ошибка прогноза: ' + (data.error || 'Неизвестная ошибка'));
+            showError('Error: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
-        console.error('❌ Ошибка:', error);
-        showError('Ошибка подключения к серверу');
+        console.error('Error:', error);
+        showError('Connection error');
     } finally {
         hideLoading();
         btn.disabled = false;
-        btn.textContent = '🔮 Прогноз на 7 дней';
+        btn.textContent = '🔮 Predict 7 days';
     }
 }
 
@@ -339,8 +331,26 @@ function displayPrediction(prediction) {
     changeEl.textContent = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
     changeEl.className = change > 0 ? 'predicted-change positive' : 'predicted-change negative';
 
-    document.getElementById('accuracy').textContent = prediction.metrics.accuracy.toFixed(1) + '%';
     document.getElementById('rmse').textContent = `$${formatPrice(prediction.metrics.rmse)}`;
+
+    // Новые данные
+    document.getElementById('expectedPrice').textContent = `$${formatPrice(prediction.expected_price)}`;
+    document.getElementById('support').textContent = `$${formatPrice(prediction.support)}`;
+    document.getElementById('resistance').textContent = `$${formatPrice(prediction.resistance)}`;
+    document.getElementById('actionValue').textContent = prediction.action;
+    document.getElementById('confidence').textContent = `${prediction.confidence.toFixed(0)}%`;
+    
+    // Обновляем ширину confidence bar
+    document.getElementById('confidenceFill').style.width = `${prediction.confidence}%`;
+
+    const actionEl = document.getElementById('actionValue');
+    if (prediction.action === 'BUY') {
+        actionEl.style.color = '#10b981';
+    } else if (prediction.action === 'SELL') {
+        actionEl.style.color = '#ef4444';
+    } else {
+        actionEl.style.color = '#f59e0b';
+    }
 
     if (currentCryptoData && currentCryptoData.indicators) {
         displayPredictionIndicators(currentCryptoData.indicators);
@@ -377,12 +387,12 @@ function displayPredictionIndicators(indicators) {
             value: `$${formatPrice(indicators.ma_50)}`
         },
         {
-            label: 'Волатильность',
+            label: 'Volatility',
             value: `${indicators.volatility.toFixed(2)}%`,
             color: indicators.volatility > 5 ? '#ef4444' : '#10b981'
         },
         {
-            label: 'Тренд',
+            label: 'Trend',
             value: `${indicators.trend_strength > 0 ? '+' : ''}${indicators.trend_strength.toFixed(1)}%`,
             color: indicators.trend_strength > 0 ? '#10b981' : '#ef4444'
         }
@@ -412,7 +422,7 @@ function displayPredictionChart(prediction) {
         predictionChart.destroy();
     }
 
-    const labels = Array.from({ length: prediction.days }, (_, i) => `День ${i + 1}`);
+    const labels = Array.from({ length: prediction.days }, (_, i) => `Day ${i + 1}`);
 
     predictionChart = new Chart(ctx, {
         type: 'line',
@@ -420,7 +430,7 @@ function displayPredictionChart(prediction) {
             labels: labels,
             datasets: [
                 {
-                    label: 'Прогноз',
+                    label: 'Prediction',
                     data: prediction.predictions,
                     borderColor: '#10b981',
                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
@@ -471,7 +481,7 @@ function setupEventListeners() {
 
 // ======================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ========================
 
-function showLoading(text = 'Загрузка...') {
+function showLoading(text = 'Loading...') {
     const loading = document.getElementById('loading');
     document.getElementById('loadingText').textContent = text;
     loading.classList.add('show');
@@ -507,5 +517,3 @@ function formatNumber(num) {
     if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
     return num.toFixed(0);
 }
-
-console.log('✅ App.js загружен');
