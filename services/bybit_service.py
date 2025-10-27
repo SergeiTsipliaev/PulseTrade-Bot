@@ -18,11 +18,21 @@ class BybitService:
         self.timeout = aiohttp.ClientTimeout(total=15)
         self._session = None
 
-    async def get_session(self):
-        """Получение или создание сессии с правильным SSL"""
-        if self._session is None or self._session.closed:
-            # Создаем SSL контекст с сертификатами certifi
+    def create_ssl_context(self):
+        """Создание SSL контекста"""
+        try:
             ssl_context = ssl.create_default_context(cafile=certifi.where())
+            return ssl_context
+        except:
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            return ssl_context
+
+    async def get_session(self):
+        """Получение или создание сессии"""
+        if self._session is None or self._session.closed:
+            ssl_context = self.create_ssl_context()
             connector = aiohttp.TCPConnector(ssl=ssl_context, limit=10)
             self._session = aiohttp.ClientSession(
                 connector=connector,
@@ -63,7 +73,7 @@ class BybitService:
 
         try:
             url = f"{self.base_url}/v5/market/instruments-info"
-            params = {"category": "spot"}
+            params = {"category": "category", "symbol": query}
 
             result = await self.fetch_url(url, params)
 
@@ -104,7 +114,7 @@ class BybitService:
         try:
             url = f"{self.base_url}/v5/market/tickers"
             params = {
-                "category": "spot",
+                "category": "inverse",
                 "symbol": symbol
             }
 

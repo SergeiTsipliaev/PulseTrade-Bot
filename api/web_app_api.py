@@ -52,7 +52,7 @@ def get_cache(key: str):
             logger.debug(f"💾 Кэш попадание: {key}")
             return value
         else:
-            del cache[key]
+            pass
     return None
 
 

@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ======================== BYBIT API ========================
-BYBIT_API_BASE = 'https://api.bybit.com'
+BYBIT_API_BASE = 'https://api-testnet.bybit.com'
 BYBIT_PUBLIC_ENDPOINT = '/v5/market'
 
 # ======================== DATABASE ========================
