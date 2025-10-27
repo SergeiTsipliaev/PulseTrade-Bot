@@ -5,7 +5,6 @@ load_dotenv()
 
 # ======================== BYBIT API ========================
 BYBIT_API_BASE = 'https://api.bybit.com'
-BYBIT_API_TESTNET = 'https://testnet.bybit.com'
 BYBIT_PUBLIC_ENDPOINT = '/v5/market'
 
 # ======================== DATABASE ========================
@@ -38,7 +37,6 @@ CACHE_TTL = 300  # 5 minutes
 PRICE_HISTORY_DAYS = 90
 
 # ======================== POPULAR CRYPTOS (BYBIT SYMBOLS) ========================
-# Используем Bybit торговые символы (USDT квоты)
 POPULAR_CRYPTOS = [
     {'symbol': 'BTCUSDT', 'name': 'Bitcoin', 'display_name': 'BTC', 'emoji': '₿'},
     {'symbol': 'ETHUSDT', 'name': 'Ethereum', 'display_name': 'ETH', 'emoji': 'Ξ'},
@@ -49,12 +47,11 @@ POPULAR_CRYPTOS = [
 ]
 
 # ======================== API LIMITS ========================
-API_REQUEST_TIMEOUT = 10
+API_REQUEST_TIMEOUT = 15
 MAX_SEARCH_RESULTS = 20
 
 # ======================== LOGGING ========================
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 LOG_FILE = 'logs/app.log'
 
-# Убедимся, что директория логов существует
 os.makedirs('logs', exist_ok=True)

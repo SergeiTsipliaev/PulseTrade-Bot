@@ -5,12 +5,13 @@ import certifi
 import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
 
 class BybitService:
-    """Сервис для работы с Bybit API V5"""
+    """Асинхронный сервис для работы с Bybit API V5"""
 
     def __init__(self):
         self.base_url = "https://api.bybit.com"
@@ -22,8 +23,7 @@ class BybitService:
         try:
             ssl_context = ssl.create_default_context(cafile=certifi.where())
             return ssl_context
-        except Exception as e:
-            logger.warning(f"⚠️ SSL контекст: {e}")
+        except:
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
@@ -46,7 +46,7 @@ class BybitService:
             await self._session.close()
 
     async def fetch_url(self, url: str, params: dict = None) -> Optional[dict]:
-        """Асинхронный запрос"""
+        """Асинхронный запрос к API"""
         session = await self.get_session()
         try:
             async with session.get(url, params=params) as response:
@@ -58,81 +58,64 @@ class BybitService:
                         logger.warning(f"❌ Bybit error: {data.get('retMsg')}")
                         return None
                 else:
-                    logger.warning(f"❌ HTTP {response.status} для {url}")
+                    logger.warning(f"❌ HTTP {response.status}")
                     return None
         except asyncio.TimeoutError:
-            logger.warning(f"⏱️ Таймаут для {url}")
+            logger.warning(f"⏱️ Таймаут запроса")
             return None
         except Exception as e:
-            logger.error(f"❌ Ошибка запроса {url}: {e}")
+            logger.error(f"❌ Ошибка запроса: {e}")
             return None
 
-    async def get_tickers(self, category: str = "spot") -> List[Dict]:
-        """Получение списка всех тикеров"""
-        url = f"{self.base_url}/v5/market/tickers"
-        params = {"category": category}
+    async def search_cryptocurrencies(self, query: str) -> List[Dict]:
+        """Поиск криптовалют по запросу"""
+        logger.info(f"🔍 Поиск: '{query}'")
 
-        result = await self.fetch_url(url, params)
-        if result and 'list' in result:
-            return result['list']
-        return []
+        try:
+            url = f"{self.base_url}/v5/market/instruments-info"
+            params = {"category": "spot"}
 
-    async def search_currencies(self, query: str) -> List[Dict]:
-        """Поиск криптовалют"""
-        logger.info(f"🔍 Поиск: {query}")
+            result = await self.fetch_url(url, params)
 
-        # Получаем все тикеры
-        tickers = await self.get_tickers()
+            if not result or 'list' not in result:
+                return []
 
-        if not tickers:
+            query_lower = query.lower().upper()
+            filtered = []
+
+            for item in result['list']:
+                symbol = item.get('symbol', '')
+                base_coin = item.get('baseCoin', '')
+                quote_coin = item.get('quoteCoin', '')
+
+                # Ищем USDT пары
+                if quote_coin != 'USDT':
+                    continue
+
+                if query_lower in symbol or query_lower in base_coin:
+                    filtered.append({
+                        'symbol': symbol,
+                        'name': base_coin,
+                        'display_name': base_coin,
+                        'emoji': '💰'
+                    })
+
+            logger.info(f"✅ Найдено: {len(filtered[:20])} криптовалют")
+            return filtered[:20]
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка поиска: {e}")
             return []
 
-        # Фильтруем по запросу
-        query_lower = query.lower()
-        filtered = []
-
-        for ticker in tickers:
-            symbol = ticker.get('symbol', '')
-
-            # Извлекаем базовую валюту (например, BTC из BTCUSDT)
-            base_currency = symbol.replace('USDT', '').replace('USDC', '').replace('USD', '')
-
-            if (query_lower in base_currency.lower() or
-                    query_lower in symbol.lower()):
-                filtered.append({
-                    'code': base_currency,
-                    'symbol': base_currency,
-                    'name': base_currency,
-                    'pair': symbol
-                })
-
-        # Убираем дубликаты
-        seen = set()
-        unique = []
-        for item in filtered:
-            if item['code'] not in seen:
-                seen.add(item['code'])
-                unique.append(item)
-
-        logger.info(f"✅ Найдено: {len(unique)} криптовалют")
-        return unique[:20]
-
-    async def get_currency_price(self, currency_id: str) -> Optional[Dict]:
+    async def get_current_price(self, symbol: str) -> Optional[Dict]:
         """Получение текущей цены"""
-        logger.info(f"💰 Получение цены: {currency_id}")
+        logger.info(f"💰 Получение цены: {symbol}")
 
-        # Формируем возможные пары
-        pairs = [
-            f"{currency_id.upper()}USDT",
-            f"{currency_id.upper()}USD",
-            f"{currency_id.upper()}USDC"
-        ]
-
-        for pair in pairs:
+        try:
             url = f"{self.base_url}/v5/market/tickers"
             params = {
                 "category": "spot",
-                "symbol": pair
+                "symbol": symbol
             }
 
             result = await self.fetch_url(url, params)
@@ -143,113 +126,157 @@ class BybitService:
                 last_price = float(ticker.get('lastPrice', 0))
                 prev_price_24h = float(ticker.get('prevPrice24h', last_price))
 
-                # Расчет изменения за 24ч
+                change_24h = 0
                 if prev_price_24h > 0:
                     change_24h = ((last_price - prev_price_24h) / prev_price_24h) * 100
-                else:
-                    change_24h = 0
+
+                logger.info(f"✅ Цена {symbol}: ${last_price}")
 
                 return {
-                    'price': last_price,
-                    'currency': 'USD',
-                    'base': currency_id.upper(),
-                    'pair': pair,
+                    'last_price': last_price,
                     'change_24h': change_24h,
+                    'high_24h': float(ticker.get('highPrice24h', last_price)),
+                    'low_24h': float(ticker.get('lowPrice24h', last_price)),
                     'volume_24h': float(ticker.get('volume24h', 0)),
-                    'high_24h': float(ticker.get('highPrice24h', 0)),
-                    'low_24h': float(ticker.get('lowPrice24h', 0))
+                    'turnover_24h': float(ticker.get('turnover24h', 0))
                 }
 
-        logger.warning(f"⚠️ Цена не найдена для {currency_id}")
-        return None
+            return None
 
-    async def get_kline_history(self, currency_id: str, interval: str = "D", limit: int = 90) -> Optional[Dict]:
-        """Получение исторических данных (свечей)"""
-        logger.info(f"📊 Получение истории: {currency_id}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения цены: {e}")
+            return None
 
-        # Формируем пары
-        pairs = [
-            f"{currency_id.upper()}USDT",
-            f"{currency_id.upper()}USD",
-            f"{currency_id.upper()}USDC"
-        ]
+    async def get_price_history(self, symbol: str, days: int = 90) -> Optional[Dict]:
+        """Получение исторических данных (свечи за дни)"""
+        logger.info(f"📊 Получение истории: {symbol} за {days} дней")
 
-        for pair in pairs:
+        try:
+            # Получаем дневные свечи
             url = f"{self.base_url}/v5/market/kline"
-
-            # Рассчитываем временные метки
-            end_time = int(datetime.now().timestamp() * 1000)
-
             params = {
                 "category": "spot",
-                "symbol": pair,
-                "interval": interval,  # D = daily
-                "limit": limit,
-                "end": end_time
+                "symbol": symbol,
+                "interval": "D",
+                "limit": min(days, 1000)
             }
 
             result = await self.fetch_url(url, params)
 
             if result and 'list' in result and len(result['list']) > 0:
                 klines = result['list']
-
-                # Bybit возвращает данные в обратном порядке (от новых к старым)
-                klines.reverse()
+                klines.reverse()  # От старых к новым
 
                 prices = []
                 timestamps = []
-                volumes = []
 
                 for kline in klines:
-                    # Формат: [startTime, openPrice, highPrice, lowPrice, closePrice, volume, turnover]
                     timestamp = int(kline[0])
                     close_price = float(kline[4])
-                    volume = float(kline[5])
 
                     timestamps.append(timestamp)
                     prices.append(close_price)
-                    volumes.append(volume)
 
-                logger.info(f"✅ Получено {len(prices)} свечей для {pair}")
+                logger.info(f"✅ Получено {len(prices)} свечей")
 
                 return {
                     'prices': prices,
-                    'timestamps': timestamps,
-                    'volumes': volumes,
-                    'pair': pair
+                    'timestamps': timestamps
                 }
 
-        logger.warning(f"⚠️ История не найдена для {currency_id}")
-        return None
+            return None
 
-    async def get_all_spot_symbols(self) -> List[Dict]:
-        """Получение всех спотовых символов для БД"""
-        logger.info("📋 Получение всех спотовых символов...")
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения истории: {e}")
+            return None
 
-        url = f"{self.base_url}/v5/market/instruments-info"
-        params = {"category": "spot"}
+    async def get_kline_data(self, symbol: str, interval: str = "60", limit: int = 200) -> Optional[List]:
+        """Получение свечей"""
+        logger.info(f"📊 Свечи: {symbol}")
 
-        result = await self.fetch_url(url, params)
+        try:
+            url = f"{self.base_url}/v5/market/kline"
+            params = {
+                "category": "spot",
+                "symbol": symbol,
+                "interval": interval,
+                "limit": limit
+            }
 
-        if result and 'list' in result:
-            symbols = []
-            for item in result['list']:
-                symbol = item.get('symbol', '')
-                base_coin = item.get('baseCoin', '')
+            result = await self.fetch_url(url, params)
 
-                if base_coin and 'USDT' in symbol:
-                    symbols.append({
-                        'coinbase_id': base_coin,
-                        'symbol': base_coin,
-                        'name': base_coin,
-                        'pair': symbol
-                    })
+            if result and 'list' in result:
+                return result['list']
 
-            logger.info(f"✅ Получено {len(symbols)} символов")
-            return symbols
+            return None
 
-        return []
+        except Exception as e:
+            logger.error(f"❌ Ошибка: {e}")
+            return None
+
+    async def calculate_technical_indicators(self, prices: List[float]) -> Dict:
+        """Расчет технических индикаторов"""
+        try:
+            prices_array = np.array(prices, dtype=float)
+
+            # RSI
+            rsi = self._calculate_rsi(prices_array)
+
+            # Moving Averages
+            ma_7 = float(np.mean(prices_array[-7:])) if len(prices_array) >= 7 else prices_array[-1]
+            ma_25 = float(np.mean(prices_array[-25:])) if len(prices_array) >= 25 else prices_array[-1]
+            ma_50 = float(np.mean(prices_array[-50:])) if len(prices_array) >= 50 else prices_array[-1]
+
+            # Volatility
+            returns = np.diff(prices_array) / prices_array[:-1] * 100
+            volatility = float(np.std(returns))
+
+            # Trend
+            if len(prices_array) > 0:
+                trend_strength = ((prices_array[-1] - prices_array[0]) / prices_array[0]) * 100
+            else:
+                trend_strength = 0
+
+            return {
+                'rsi': float(rsi),
+                'ma_7': float(ma_7),
+                'ma_25': float(ma_25),
+                'ma_50': float(ma_50),
+                'volatility': float(volatility),
+                'trend_strength': float(trend_strength)
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка расчета индикаторов: {e}")
+            return {
+                'rsi': 50.0,
+                'ma_7': 0.0,
+                'ma_25': 0.0,
+                'ma_50': 0.0,
+                'volatility': 0.0,
+                'trend_strength': 0.0
+            }
+
+    def _calculate_rsi(self, prices: np.ndarray, period: int = 14) -> float:
+        """Расчет RSI"""
+        try:
+            if len(prices) < period:
+                return 50.0
+
+            deltas = np.diff(prices)
+            gains = np.where(deltas > 0, deltas, 0)
+            losses = np.where(deltas < 0, -deltas, 0)
+
+            avg_gain = np.mean(gains[-period:])
+            avg_loss = np.mean(losses[-period:])
+
+            rs = avg_gain / avg_loss if avg_loss > 0 else 0
+            rsi = 100 - (100 / (1 + rs)) if rs >= 0 else 50
+
+            return float(rsi)
+        except:
+            return 50.0
 
 
 # Глобальный экземпляр
-BybitServise = BybitService()
+bybit_service = BybitService()

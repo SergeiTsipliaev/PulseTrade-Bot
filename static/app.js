@@ -1,14 +1,9 @@
 // ======================== КОНФИГУРАЦИЯ ========================
-const API_URL = window.location.origin + '/api';
+const API_URL = '/api';
 let selectedCrypto = null;
 let priceChart = null;
 let predictionChart = null;
 let searchTimeout = null;
-
-// Инициализация Telegram WebApp
-const tg = window.Telegram.WebApp;
-tg.expand();
-tg.ready();
 
 // ======================== ИНИЦИАЛИЗАЦИЯ ========================
 
@@ -45,7 +40,6 @@ function setupSearch() {
             return;
         }
 
-        // Показываем индикатор поиска
         searchResults.innerHTML = '<div class="search-result-item">🔍 Поиск...</div>';
         searchResults.classList.add('show');
 
@@ -54,7 +48,6 @@ function setupSearch() {
         }, 300);
     });
 
-    // Закрытие при клике вне поиска
     document.addEventListener('click', (e) => {
         if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
             searchResults.classList.remove('show');
@@ -116,7 +109,6 @@ async function renderCryptoGrid() {
         const data = await response.json();
 
         if (data.success) {
-            // Берем только первые 6 криптовалют
             const cryptos = data.data.slice(0, 6);
 
             cryptos.forEach(crypto => {
@@ -147,7 +139,6 @@ function updateCryptoGrid() {
         card.classList.remove('active');
     });
 
-    // Находим и выделяем текущий
     if (selectedCrypto) {
         document.querySelectorAll('.crypto-card').forEach(card => {
             const symbol = card.querySelector('.crypto-symbol').textContent;
@@ -186,17 +177,14 @@ async function loadCryptoData(symbol) {
 function displayCryptoData(data) {
     console.log(`🎯 Отображение данных для: ${data.symbol}`);
 
-    // Цена
     const priceCard = document.getElementById('priceCard');
     priceCard.classList.add('show');
 
     document.getElementById('cryptoName').textContent = data.symbol;
 
     const currentPrice = data.current.price;
-    document.getElementById('currentPrice').textContent =
-        `$${formatPrice(currentPrice)}`;
+    document.getElementById('currentPrice').textContent = `$${formatPrice(currentPrice)}`;
 
-    // Изменение цены
     const change = data.current.change_24h || 0;
     const changeEl = document.getElementById('priceChange');
     const changeIcon = change >= 0 ? '↑' : '↓';
@@ -206,16 +194,10 @@ function displayCryptoData(data) {
     changeEl.style.color = changeColor;
     changeEl.style.background = changeColor + '20';
 
-    // High/Low
-    document.getElementById('high24h').textContent =
-        `$${formatPrice(data.current.high_24h)}`;
-    document.getElementById('low24h').textContent =
-        `$${formatPrice(data.current.low_24h)}`;
+    document.getElementById('high24h').textContent = `$${formatPrice(data.current.high_24h)}`;
+    document.getElementById('low24h').textContent = `$${formatPrice(data.current.low_24h)}`;
 
-    // График
     displayPriceChart(data.history);
-
-    // Индикаторы
     displayIndicators(data.indicators);
 
     console.log(`✅ Данные отображены`);
@@ -233,7 +215,6 @@ function displayPriceChart(history) {
         priceChart.destroy();
     }
 
-    // Форматируем метки времени
     const labels = history.timestamps.map(ts => {
         const date = new Date(ts);
         return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`;
@@ -341,9 +322,9 @@ function displayIndicators(indicators) {
 }
 
 function getRSIColor(rsi) {
-    if (rsi > 70) return '#ef4444';      // Перекупленность
-    if (rsi < 30) return '#10b981';      // Перепроданность
-    return '#f59e0b';                     // Нейтрально
+    if (rsi > 70) return '#ef4444';
+    if (rsi < 30) return '#10b981';
+    return '#f59e0b';
 }
 
 // ======================== ПРОГНОЗ ========================
@@ -356,9 +337,9 @@ async function makePrediction() {
 
     const btn = document.getElementById('predictBtn');
     btn.disabled = true;
-    btn.textContent = '🧠 Обучение нейросети...';
+    btn.textContent = '🧠 Обучение...';
 
-    showLoading('Обучение LSTM модели...');
+    showLoading('Обучение нейросети...');
 
     try {
         const response = await fetch(`${API_URL}/predict/${selectedCrypto}`, {
@@ -379,7 +360,7 @@ async function makePrediction() {
     } finally {
         hideLoading();
         btn.disabled = false;
-        btn.textContent = '🔮 Прогноз LSTM на 7 дней';
+        btn.textContent = '🔮 Прогноз на 7 дней';
     }
 }
 
@@ -387,7 +368,6 @@ function displayPrediction(prediction) {
     const section = document.getElementById('predictionSection');
     section.classList.add('show');
 
-    // Сигнал
     const signalEmojis = {
         'STRONG_BUY': '🟢',
         'BUY': '🟢',
@@ -404,14 +384,11 @@ function displayPrediction(prediction) {
     changeEl.textContent = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
     changeEl.className = change > 0 ? 'predicted-change positive' : 'predicted-change negative';
 
-    // Метрики
     document.getElementById('accuracy').textContent = prediction.metrics.accuracy.toFixed(1) + '%';
     document.getElementById('rmse').textContent = `$${formatPrice(prediction.metrics.rmse)}`;
 
-    // График прогноза
     displayPredictionChart(prediction);
 
-    // Прокрутка к прогнозу
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -473,7 +450,7 @@ function displayPredictionChart(prediction) {
     ctx.style.height = '300px';
 }
 
-// ======================== ОБРАБОТЧИКИ СОБЫТИЙ ========================
+// ======================== ОБРАБОТЧИКИ ========================
 
 function setupEventListeners() {
     document.getElementById('predictBtn').onclick = makePrediction;
@@ -492,7 +469,7 @@ function hideLoading() {
 }
 
 function showError(message) {
-    tg.showAlert(message);
+    alert(message);
 }
 
 function formatPrice(price) {
@@ -517,10 +494,5 @@ function formatNumber(num) {
     if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
     return num.toFixed(0);
 }
-
-// Обработка ошибок
-window.addEventListener('error', (event) => {
-    console.error('❌ Ошибка приложения:', event.error);
-});
 
 console.log('✅ App.js загружен');

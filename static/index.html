@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Crypto Tracker - Bybit</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
@@ -25,8 +24,8 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
+            background: #ffffff;
+            color: #000000;
             padding: 16px;
             padding-bottom: 100px;
         }
@@ -60,7 +59,7 @@
             border: 2px solid var(--primary);
             border-radius: 12px;
             font-size: 16px;
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            background: #ffffff;
             color: var(--text);
             transition: all 0.3s;
         }
@@ -79,7 +78,7 @@
             top: 100%;
             left: 0;
             right: 0;
-            background: var(--tg-theme-bg-color, #ffffff);
+            background: #ffffff;
             border: 1px solid #ddd;
             border-radius: 12px;
             max-height: 300px;
@@ -135,18 +134,23 @@
         .crypto-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
+            gap: 12px;
             margin-bottom: 24px;
         }
 
         .crypto-card {
             background: var(--secondary);
             border-radius: 12px;
-            padding: 12px;
+            padding: 16px 12px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s;
             border: 2px solid transparent;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
         .crypto-card:active {
@@ -164,12 +168,12 @@
         }
 
         .crypto-emoji {
-            font-size: 24px;
-            margin-bottom: 8px;
+            font-size: 32px;
+            margin-bottom: 6px;
         }
 
         .crypto-symbol {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
             transition: all 0.3s;
         }
@@ -491,7 +495,7 @@
 
         <!-- КНОПКА ПРОГНОЗА -->
         <button class="btn btn-primary hidden" id="predictBtn">
-            🔮 Прогноз LSTM на 7 дней
+            🔮 Прогноз на 7 дней
         </button>
 
         <!-- ПРОГНОЗ -->

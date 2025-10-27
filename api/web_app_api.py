@@ -4,14 +4,13 @@ import asyncio
 import logging
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 import numpy as np
 from functools import wraps
 
 # Импорты из проекта
-from config import POPULAR_CRYPTOS, CACHE_TTL, DEBUG, SECRET_KEY, BYBIT_API_BASE
-from models.database import db
-from services.bybit_service import bybit_service
+from config import POPULAR_CRYPTOS, CACHE_TTL, DEBUG, SECRET_KEY
+from services import bybit_service
 
 # Настройка логирования
 logging.basicConfig(
@@ -21,7 +20,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Инициализация Flask
-app = Flask(__name__, static_folder='../static')
+app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = SECRET_KEY
 CORS(app)
 
@@ -33,7 +32,6 @@ cache = {}
 
 def run_async(func):
     """Декоратор для запуска асинхронных функций в Flask"""
-
     @wraps(func)
     def wrapper(*args, **kwargs):
         loop = asyncio.new_event_loop()
@@ -43,7 +41,6 @@ def run_async(func):
             return result
         finally:
             loop.close()
-
     return wrapper
 
 
@@ -64,53 +61,16 @@ def set_cache(key: str, value):
     cache[key] = (value, time.time())
 
 
-def init_popular_cryptos():
-    """Инициализация популярных криптовалют в БД"""
-    if db and db.is_connected:
-        for crypto in POPULAR_CRYPTOS:
-            db.add_cryptocurrency(
-                symbol=crypto['symbol'],
-                name=crypto['name'],
-                display_name=crypto['display_name'],
-                emoji=crypto['emoji']
-            )
-        logger.info(f"✅ Загружено {len(POPULAR_CRYPTOS)} популярных криптовалют")
-
-
-# ======================== ИНИЦИАЛИЗАЦИЯ ========================
-
-@app.before_request
-def before_request():
-    """Выполнить перед каждым запросом"""
-    pass
-
-
-@app.teardown_appcontext
-def shutdown_session(exception=None):
-    """Очистка при завершении"""
-    pass
-
-
-# ======================== ОСНОВНЫЕ МАРШРУТЫ ========================
+# ======================== МАРШРУТЫ ========================
 
 @app.route('/')
 def index():
-    """Главная страница Mini App"""
+    """Главная страница"""
     try:
         return send_from_directory(app.static_folder, 'index.html')
     except Exception as e:
         logger.error(f"❌ Ошибка загрузки index.html: {e}")
         return "Error loading app", 500
-
-
-@app.route('/app.js')
-def app_js():
-    """JavaScript приложения"""
-    try:
-        return send_from_directory(app.static_folder, 'app.js')
-    except Exception as e:
-        logger.error(f"❌ Ошибка загрузки app.js: {e}")
-        return "Error loading app.js", 500
 
 
 @app.route('/api/health', methods=['GET'])
@@ -119,17 +79,15 @@ def health_check():
     return jsonify({
         'status': 'ok',
         'timestamp': datetime.now().isoformat(),
-        'database': 'connected' if db and db.is_connected else 'disconnected',
         'api': 'Bybit API v5',
         'features': ['search', 'ticker', 'klines', 'indicators', 'predictions']
     }), 200
 
 
-# ======================== ПОИСК КРИПТОВАЛЮТ ========================
-
 @app.route('/api/search', methods=['GET'])
-async def search_cryptocurrencies_async():
-    """Асинхронный поиск криптовалют"""
+@run_async
+async def search_cryptocurrencies():
+    """Поиск криптовалют"""
     query = request.args.get('q', '').strip()
 
     if not query or len(query) < 1:
@@ -144,31 +102,8 @@ async def search_cryptocurrencies_async():
         return jsonify(cached_result)
 
     try:
-        # Сначала ищем в БД
-        if db and db.is_connected:
-            db_results = db.search_cryptocurrencies(query)
-            if db_results:
-                result = {
-                    'success': True,
-                    'data': db_results,
-                    'source': 'database',
-                    'count': len(db_results)
-                }
-                set_cache(cache_key, result)
-                return jsonify(result)
-
-        # Если в БД не найдено, ищем через Bybit API
+        # Ищем через Bybit API
         api_results = await bybit_service.search_cryptocurrencies(query)
-
-        # Сохраняем результаты в БД
-        if db and db.is_connected:
-            for crypto in api_results:
-                db.add_cryptocurrency(
-                    symbol=crypto['symbol'],
-                    name=crypto['name'],
-                    display_name=crypto['display_name'],
-                    emoji=crypto['emoji']
-                )
 
         result = {
             'success': True,
@@ -188,12 +123,6 @@ async def search_cryptocurrencies_async():
         }), 500
 
 
-# Оборачиваем асинхронную функцию
-app.route('/api/search', methods=['GET'])(run_async(search_cryptocurrencies_async))
-
-
-# ======================== ВСЕ КРИПТОВАЛЮТЫ ========================
-
 @app.route('/api/cryptos/all', methods=['GET'])
 def get_all_cryptocurrencies():
     """Получение всех популярных криптовалют"""
@@ -204,16 +133,11 @@ def get_all_cryptocurrencies():
         if cached_result:
             return jsonify(cached_result)
 
-        if db and db.is_connected:
-            cryptos = db.get_all_cryptocurrencies()
-        else:
-            cryptos = POPULAR_CRYPTOS
-
         result = {
             'success': True,
-            'data': cryptos,
-            'total': len(cryptos),
-            'source': 'database' if db and db.is_connected else 'fallback'
+            'data': POPULAR_CRYPTOS,
+            'total': len(POPULAR_CRYPTOS),
+            'source': 'config'
         }
         set_cache(cache_key, result)
         return jsonify(result)
@@ -227,10 +151,9 @@ def get_all_cryptocurrencies():
         }), 500
 
 
-# ======================== ДАННЫЕ КРИПТОВАЛЮТЫ ========================
-
 @app.route('/api/crypto/<symbol>', methods=['GET'])
-async def get_crypto_data_async(symbol: str):
+@run_async
+async def get_crypto_data(symbol: str):
     """Получение полных данных по криптовалюте"""
     symbol = symbol.upper()
     if not symbol.endswith('USDT'):
@@ -245,7 +168,7 @@ async def get_crypto_data_async(symbol: str):
         return jsonify(cached_result)
 
     try:
-        # Получаем текущую цену (ticker)
+        # Получаем текущую цену
         ticker = await bybit_service.get_current_price(symbol)
         if not ticker:
             return jsonify({
@@ -258,24 +181,10 @@ async def get_crypto_data_async(symbol: str):
         if not history:
             history = {'prices': [ticker['last_price']], 'timestamps': [int(time.time() * 1000)]}
 
-        # Получаем 1h кандли для дополнительных данных
-        klines = await bybit_service.get_kline_data(symbol, interval='60', limit=24)
-
         prices = history['prices']
 
         # Рассчитываем индикаторы
         indicators = await bybit_service.calculate_technical_indicators(prices)
-
-        # Кэшируем цену в БД если доступна
-        if db and db.is_connected:
-            db.cache_price_history(
-                symbol=symbol,
-                price=ticker['last_price'],
-                change_24h=ticker['change_24h'],
-                volume_24h=ticker['volume_24h'],
-                high_24h=ticker['high_24h'],
-                low_24h=ticker['low_24h']
-            )
 
         result = {
             'success': True,
@@ -310,14 +219,9 @@ async def get_crypto_data_async(symbol: str):
         }), 500
 
 
-# Оборачиваем асинхронную функцию
-app.route('/api/crypto/<symbol>', methods=['GET'])(run_async(get_crypto_data_async))
-
-
-# ======================== ПРОГНОЗ ЦЕНЫ ========================
-
 @app.route('/api/predict/<symbol>', methods=['POST'])
-async def predict_price_async(symbol: str):
+@run_async
+async def predict_price(symbol: str):
     """Прогноз цены на 7 дней"""
     symbol = symbol.upper()
     if not symbol.endswith('USDT'):
@@ -337,7 +241,7 @@ async def predict_price_async(symbol: str):
         prices = np.array(history['prices'], dtype=float)
         current_price = prices[-1]
 
-        # Простой прогноз на основе тренда
+        # Простой линейный прогноз
         predictions = simple_linear_prediction(prices, days=7)
 
         # Рассчитываем сигнал
@@ -374,14 +278,9 @@ async def predict_price_async(symbol: str):
         }), 500
 
 
-# Оборачиваем асинхронную функцию
-app.route('/api/predict/<symbol>', methods=['POST'])(run_async(predict_price_async))
-
-
-# ======================== ПРОГНОЗ СВЕЧЕЙ ========================
-
 @app.route('/api/klines/<symbol>', methods=['GET'])
-async def get_klines_async(symbol: str):
+@run_async
+async def get_klines(symbol: str):
     """Получение свечей для графика"""
     symbol = symbol.upper()
     if not symbol.endswith('USDT'):
@@ -427,38 +326,30 @@ async def get_klines_async(symbol: str):
         }), 500
 
 
-# Оборачиваем асинхронную функцию
-app.route('/api/klines/<symbol>', methods=['GET'])(run_async(get_klines_async))
-
-
-# ======================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ПРОГНОЗА ========================
+# ======================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ========================
 
 def simple_linear_prediction(prices: np.ndarray, days: int = 7) -> np.ndarray:
-    """Простой линейный прогноз на основе регрессии"""
+    """Простой линейный прогноз"""
     try:
         x = np.arange(len(prices))
         y = prices
 
-        # Линейная регрессия
         coeffs = np.polyfit(x, y, 1)
         poly = np.poly1d(coeffs)
 
-        # Прогноз на следующие дни
         future_x = np.arange(len(prices), len(prices) + days)
         predictions = poly(future_x)
 
-        # Убеждаемся что цены остаются положительными
         predictions = np.maximum(predictions, prices[-1] * 0.5)
 
         return predictions
     except Exception as e:
         logger.error(f"❌ Ошибка прогноза: {e}")
-        # Fallback: вернуть текущую цену
         return np.array([prices[-1]] * days)
 
 
 def get_trading_signal(trend: float, prices: np.ndarray) -> tuple:
-    """Получить торговый сигнал на основе тренда"""
+    """Получить торговый сигнал"""
     rsi = calculate_rsi(prices)
 
     if trend > 10 and rsi < 70:
@@ -497,11 +388,10 @@ def calculate_rsi(prices: np.ndarray, period: int = 14) -> float:
 
 
 def calculate_accuracy(predictions: np.ndarray, actual: np.ndarray) -> float:
-    """Расчет точности прогноза (MAPE)"""
+    """Расчет точности прогноза"""
     try:
         if len(predictions) < 1 or len(actual) < 1:
             return 0.0
-        # Используем последние значения для сравнения
         mape = np.mean(np.abs((actual[-len(predictions):] - predictions) / actual[-len(predictions):]))
         accuracy = max(0, 100 - mape * 100)
         return min(100, float(accuracy))
@@ -542,12 +432,9 @@ def internal_error(error):
     }), 500
 
 
-# ======================== ЗАПУСК ПРИЛОЖЕНИЯ ========================
+# ======================== ЗАПУСК ========================
 
 if __name__ == '__main__':
-    # Инициализируем популярные криптовалюты
-    init_popular_cryptos()
-
     port = int(os.environ.get('PORT', 5000))
     print(f"\n{'=' * 70}")
     print(f"🚀 Crypto Tracker (Bybit API)")
@@ -555,7 +442,6 @@ if __name__ == '__main__':
     print(f"🔍 Поиск: Да")
     print(f"📈 График: Да")
     print(f"🧠 Прогнозы: Да")
-    print(f"💾 БД: {'Подключена' if db and db.is_connected else 'Отключена'}")
     print(f"{'=' * 70}\n")
 
     app.run(
