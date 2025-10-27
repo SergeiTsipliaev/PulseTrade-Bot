@@ -1,25 +1,31 @@
-FROM python:3.13.5
+FROM python:3.13-slim
 
 WORKDIR /app
 
-# Установка зависимостей для PostgreSQL
+# Установка системных зависимостей
 RUN apt-get update && apt-get install -y \
     gcc \
-    postgresql-dev \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Копирование requirements
 COPY requirements.txt .
 
 # Установка Python зависимостей
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Копирование исходного кода
+# Копирование кода приложения
 COPY . .
 
-# Создание директорий
-RUN mkdir -p /app/logs
+# Создание необходимых директорий
+RUN mkdir -p logs data/models
 
+# Открытие порта
 EXPOSE 5000
 
+# Переменные окружения
+ENV FLASK_ENV=production
+ENV PYTHONUNBUFFERED=1
+
+# Запуск приложения
 CMD ["python", "-m", "api.web_app_api"]

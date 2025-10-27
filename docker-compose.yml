@@ -1,12 +1,14 @@
 version: '3.8'
 
 services:
+  # ======================== PostgreSQL DATABASE ========================
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
+    container_name: pulsetrader-postgres
     environment:
-      POSTGRES_DB: cryptobot
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${DB_NAME:-pulsetrader}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
@@ -15,34 +17,58 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    networks:
+      - pulsetrader_network
+    restart: unless-stopped
 
+  # ======================== FLASK API ========================
   api:
     build: .
+    container_name: pulsetrader-api
     ports:
       - "5000:5000"
     environment:
       - DB_HOST=postgres
-      - DB_NAME=cryptobot
-      - DB_USER=postgres
-      - DB_PASSWORD=password
       - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-pulsetrader}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./:/app
-    command: python -m api.web_app_api
+      - ./logs:/app/logs
+    networks:
+      - pulsetrader_network
+    restart: unless-stopped
+    command: >
+      sh -c "python scripts/init_database.py && 
+             python -m api.web_app_api"
 
+  # ======================== NGINX PROXY ========================
   nginx:
     image: nginx:alpine
+    container_name: pulsetrader-nginx
     ports:
       - "80:80"
+      - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./static:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./static:/usr/share/nginx/html:ro
     depends_on:
       - api
+    networks:
+      - pulsetrader_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+    driver: local
+
+networks:
+  pulsetrader_network:
+    driver: bridge

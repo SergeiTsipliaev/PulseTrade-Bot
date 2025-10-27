@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Crypto Tracker - Поиск криптовалют</title>
+    <title>Crypto Tracker - Bybit</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
@@ -13,44 +13,65 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --primary: #3390ec;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --secondary: #f4f4f5;
+            --text: #000000;
+            --text-secondary: #999;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--tg-theme-bg-color, #ffffff);
             color: var(--tg-theme-text-color, #000000);
             padding: 16px;
-            padding-bottom: 80px;
+            padding-bottom: 100px;
         }
 
+        /* ======================== HEADER ======================== */
         .header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
 
         .header h1 {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 8px;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
         }
 
-        /* ПОИСК */
+        .header p {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* ======================== ПОИСК ======================== */
         .search-container {
             position: relative;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
 
         .search-input {
             width: 100%;
-            padding: 16px;
-            border: 2px solid var(--tg-theme-button-color, #3390ec);
+            padding: 12px 16px;
+            border: 2px solid var(--primary);
             border-radius: 12px;
             font-size: 16px;
             background: var(--tg-theme-secondary-bg-color, #f4f4f5);
-            color: var(--tg-theme-text-color, #000000);
+            color: var(--text);
+            transition: all 0.3s;
         }
 
         .search-input:focus {
             outline: none;
-            border-color: var(--tg-theme-button-color, #3390ec);
+            box-shadow: 0 0 0 3px rgba(51, 144, 236, 0.1);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-secondary);
         }
 
         .search-results {
@@ -59,101 +80,107 @@
             left: 0;
             right: 0;
             background: var(--tg-theme-bg-color, #ffffff);
-            border: 1px solid var(--tg-theme-hint-color, #999);
-            border-radius: 8px;
-            max-height: 200px;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            max-height: 300px;
             overflow-y: auto;
             z-index: 1000;
             display: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-top: 8px;
+        }
+
+        .search-results.show {
+            display: block;
         }
 
         .search-result-item {
             padding: 12px 16px;
-            border-bottom: 1px solid var(--tg-theme-hint-color, #eee);
+            border-bottom: 1px solid #eee;
             cursor: pointer;
+            transition: all 0.2s;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 12px;
         }
 
         .search-result-item:hover {
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            background: var(--secondary);
         }
 
-        .crypto-symbol {
-            font-weight: bold;
-            font-size: 16px;
+        .search-result-info {
+            flex: 1;
         }
 
-        .crypto-name {
-            color: var(--tg-theme-hint-color, #999);
+        .search-result-symbol {
+            font-weight: 600;
+            color: var(--primary);
             font-size: 14px;
         }
 
-        /* КНОПКА ВСЕХ КРИПТОВАЛЮТ */
-        .all-cryptos-btn {
-            width: 100%;
-            padding: 16px;
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
-            border: 2px solid var(--tg-theme-button-color, #3390ec);
-            border-radius: 12px;
-            color: var(--tg-theme-button-color, #3390ec);
+        .search-result-name {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        /* ======================== СЕТКА КРИПТОВАЛЮТ ======================== */
+        .section-title {
             font-size: 16px;
             font-weight: 600;
-            cursor: pointer;
-            margin-bottom: 20px;
-            transition: all 0.3s;
+            margin-bottom: 12px;
+            color: var(--text);
         }
 
-        .all-cryptos-btn:active {
-            transform: scale(0.98);
-        }
-
-        /* СЕТКА КРИПТОВАЛЮТ */
         .crypto-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
             margin-bottom: 24px;
         }
 
         .crypto-card {
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            background: var(--secondary);
             border-radius: 12px;
-            padding: 16px;
+            padding: 12px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s;
             border: 2px solid transparent;
         }
 
-        .crypto-card.active {
-            border-color: var(--tg-theme-button-color, #3390ec);
-            background: var(--tg-theme-button-color, #3390ec);
-            color: white;
-        }
-
         .crypto-card:active {
             transform: scale(0.95);
         }
 
+        .crypto-card.active {
+            border-color: var(--primary);
+            background: var(--primary);
+        }
+
+        .crypto-card.active .crypto-emoji,
+        .crypto-card.active .crypto-symbol {
+            color: white;
+        }
+
         .crypto-emoji {
-            font-size: 32px;
+            font-size: 24px;
             margin-bottom: 8px;
         }
 
-        .crypto-symbol-small {
+        .crypto-symbol {
             font-size: 12px;
             font-weight: 600;
+            transition: all 0.3s;
         }
 
-        /* ОСТАЛЬНЫЕ СТИЛИ (из предыдущей версии) */
+        /* ======================== ОСНОВНЫЕ КАРТОЧКИ ======================== */
         .price-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 16px;
             padding: 24px;
             color: white;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             display: none;
         }
 
@@ -161,22 +188,62 @@
             display: block;
         }
 
-        .price-main {
-            font-size: 36px;
-            font-weight: bold;
-            margin: 12px 0;
+        .price-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .price-crypto-name {
+            font-size: 18px;
+            font-weight: 600;
         }
 
         .price-change {
-            font-size: 18px;
+            padding: 4px 8px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .price-main {
+            font-size: 42px;
+            font-weight: bold;
+            margin: 16px 0;
+        }
+
+        .price-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            font-size: 12px;
             opacity: 0.9;
         }
 
+        .price-info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .price-info-label {
+            opacity: 0.8;
+            font-size: 11px;
+        }
+
+        .price-info-value {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        /* ======================== ГРАФИК ======================== */
         .chart-container {
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            background: var(--secondary);
             border-radius: 16px;
             padding: 16px;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             display: none;
         }
 
@@ -184,32 +251,47 @@
             display: block;
         }
 
+        #priceChart {
+            max-height: 250px;
+        }
+
+        /* ======================== ИНДИКАТОРЫ ======================== */
         .indicators-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .indicators-grid.show {
+            display: grid;
         }
 
         .indicator-card {
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            background: var(--secondary);
             border-radius: 12px;
             padding: 16px;
         }
 
         .indicator-label {
-            font-size: 12px;
-            color: var(--tg-theme-hint-color, #999);
-            margin-bottom: 4px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            font-weight: 600;
         }
 
         .indicator-value {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: bold;
+            color: var(--primary);
         }
 
+        /* ======================== ПРОГНОЗ ======================== */
         .prediction-section {
             display: none;
+            margin-bottom: 24px;
         }
 
         .prediction-section.show {
@@ -217,28 +299,36 @@
         }
 
         .prediction-card {
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            background: var(--secondary);
             border-radius: 16px;
             padding: 24px;
             text-align: center;
             margin-bottom: 16px;
         }
 
-        .signal {
-            font-size: 48px;
+        .signal-emoji {
+            font-size: 60px;
             margin-bottom: 12px;
         }
 
         .signal-text {
-            font-size: 24px;
-            font-weight: bold;
+            font-size: 20px;
+            font-weight: 700;
             margin-bottom: 8px;
         }
 
         .predicted-change {
-            font-size: 32px;
+            font-size: 36px;
             font-weight: bold;
-            color: var(--tg-theme-button-color, #3390ec);
+            margin-bottom: 16px;
+        }
+
+        .predicted-change.positive {
+            color: var(--success);
+        }
+
+        .predicted-change.negative {
+            color: var(--danger);
         }
 
         .metrics {
@@ -246,6 +336,8 @@
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
             margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #ddd;
         }
 
         .metric-item {
@@ -253,18 +345,21 @@
         }
 
         .metric-label {
-            font-size: 12px;
-            color: var(--tg-theme-hint-color, #999);
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 4px;
         }
 
         .metric-value {
             font-size: 18px;
-            font-weight: bold;
+            font-weight: 600;
         }
 
+        /* ======================== КНОПКИ ======================== */
         .btn {
             width: 100%;
-            padding: 16px;
+            padding: 14px 16px;
             border-radius: 12px;
             font-size: 16px;
             font-weight: 600;
@@ -275,8 +370,8 @@
         }
 
         .btn-primary {
-            background: var(--tg-theme-button-color, #3390ec);
-            color: var(--tg-theme-button-text-color, #ffffff);
+            background: var(--primary);
+            color: white;
         }
 
         .btn-primary:active {
@@ -289,15 +384,21 @@
             cursor: not-allowed;
         }
 
+        /* ======================== ЗАГРУЗКА ======================== */
         .loading {
             text-align: center;
-            padding: 40px;
-            color: var(--tg-theme-hint-color, #999);
+            padding: 40px 20px;
+            color: var(--text-secondary);
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
         }
 
         .spinner {
-            border: 3px solid var(--tg-theme-hint-color, #f3f3f3);
-            border-top: 3px solid var(--tg-theme-button-color, #3390ec);
+            border: 3px solid var(--secondary);
+            border-top: 3px solid var(--primary);
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -310,157 +411,104 @@
             100% { transform: rotate(360deg); }
         }
 
+        .loading-text {
+            font-size: 14px;
+        }
+
+        /* ======================== УТИЛИТЫ ======================== */
         .hidden {
             display: none !important;
         }
 
-        .section-title {
-            font-size: 18px;
-            font-weight: bold;
+        .text-center {
+            text-align: center;
+        }
+
+        .text-muted {
+            color: var(--text-secondary);
+        }
+
+        .mt-16 {
+            margin-top: 16px;
+        }
+
+        .mb-16 {
             margin-bottom: 16px;
-        }
-
-        /* МОДАЛЬНОЕ ОКНО ВСЕХ КРИПТОВАЛЮТ */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 2000;
-            padding: 20px;
-        }
-
-        .modal.show {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-content {
-            background: var(--tg-theme-bg-color, #ffffff);
-            border-radius: 16px;
-            padding: 20px;
-            max-width: 400px;
-            width: 100%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .modal-title {
-            font-size: 20px;
-            font-weight: bold;
-        }
-
-        .close-modal {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: var(--tg-theme-text-color, #000000);
-        }
-
-        .crypto-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .crypto-list-item {
-            padding: 12px 16px;
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
-            border-radius: 8px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            transition: all 0.3s;
-        }
-
-        .crypto-list-item:active {
-            transform: scale(0.98);
-            background: var(--tg-theme-button-color, #3390ec);
-            color: white;
         }
     </style>
 </head>
 <body>
     <div id="app">
+        <!-- HEADER -->
         <div class="header">
-            <h1>🔍 Crypto Tracker</h1>
-            <p>Поиск и анализ криптовалют</p>
+            <h1>💰 Crypto Tracker</h1>
+            <p>Анализ и прогнозы криптовалют</p>
         </div>
 
         <!-- ПОИСК -->
         <div class="search-container">
-            <input type="text" class="search-input" id="searchInput"
-                   placeholder="Введите название или символ криптовалюты..."
-                   autocomplete="off">
+            <input
+                type="text"
+                class="search-input"
+                id="searchInput"
+                placeholder="Поиск криптовалюты..."
+                autocomplete="off"
+            >
             <div class="search-results" id="searchResults"></div>
         </div>
 
-        <!-- КНОПКА ВСЕХ КРИПТОВАЛЮТ -->
-        <button class="all-cryptos-btn" id="allCryptosBtn">
-            📋 Показать все криптовалюты
-        </button>
+        <!-- ПОПУЛЯРНЫЕ КРИПТОВАЛЮТЫ -->
+        <div class="section-title">Популярные</div>
+        <div class="crypto-grid" id="cryptoGrid"></div>
 
-        <!-- МОДАЛЬНОЕ ОКНО ВСЕХ КРИПТОВАЛЮТ -->
-        <div class="modal" id="allCryptosModal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <div class="modal-title">Все криптовалюты</div>
-                    <button class="close-modal" id="closeModal">×</button>
+        <!-- ЦЕНА -->
+        <div class="price-card" id="priceCard">
+            <div class="price-header">
+                <div class="price-crypto-name" id="cryptoName"></div>
+                <div class="price-change" id="priceChange"></div>
+            </div>
+            <div class="price-main" id="currentPrice">$0.00</div>
+            <div class="price-info">
+                <div class="price-info-item">
+                    <div class="price-info-label">Макс (24ч)</div>
+                    <div class="price-info-value" id="high24h">$0.00</div>
                 </div>
-                <div class="crypto-list" id="cryptoList"></div>
+                <div class="price-info-item">
+                    <div class="price-info-label">Мин (24ч)</div>
+                    <div class="price-info-value" id="low24h">$0.00</div>
+                </div>
             </div>
         </div>
 
-        <!-- ОСТАЛЬНАЯ ЧАСТЬ ИНТЕРФЕЙСА -->
-        <div class="section-title">Популярные криптовалюты</div>
-        <div class="crypto-grid" id="cryptoGrid"></div>
-
-        <div class="price-card" id="priceCard">
-            <div id="cryptoName"></div>
-            <div class="price-main" id="currentPrice"></div>
-            <div class="price-change" id="priceChange"></div>
-        </div>
-
+        <!-- ГРАФИК -->
         <div class="chart-container" id="chartContainer">
             <canvas id="priceChart"></canvas>
         </div>
 
-        <div id="indicatorsSection" class="hidden">
-            <div class="section-title">📊 Технический анализ</div>
-            <div class="indicators-grid" id="indicatorsGrid"></div>
-        </div>
+        <!-- ИНДИКАТОРЫ -->
+        <div class="section-title">📊 Технический анализ</div>
+        <div class="indicators-grid" id="indicatorsGrid"></div>
 
+        <!-- КНОПКА ПРОГНОЗА -->
         <button class="btn btn-primary hidden" id="predictBtn">
-            🔮 Сделать прогноз LSTM
+            🔮 Прогноз LSTM на 7 дней
         </button>
 
+        <!-- ПРОГНОЗ -->
         <div class="prediction-section" id="predictionSection">
-            <div class="section-title">🔮 Прогноз на 7 дней</div>
+            <div class="section-title">🔮 Прогноз</div>
             <div class="prediction-card">
-                <div class="signal" id="signalEmoji"></div>
+                <div class="signal-emoji" id="signalEmoji"></div>
                 <div class="signal-text" id="signalText"></div>
                 <div class="predicted-change" id="predictedChange"></div>
                 <div class="metrics">
                     <div class="metric-item">
                         <div class="metric-label">Точность</div>
-                        <div class="metric-value" id="accuracy"></div>
+                        <div class="metric-value" id="accuracy">--</div>
                     </div>
                     <div class="metric-item">
                         <div class="metric-label">RMSE</div>
-                        <div class="metric-value" id="rmse"></div>
+                        <div class="metric-value" id="rmse">--</div>
                     </div>
                 </div>
             </div>
@@ -469,9 +517,10 @@
             </div>
         </div>
 
-        <div class="loading hidden" id="loading">
+        <!-- ЗАГРУЗКА -->
+        <div class="loading" id="loading">
             <div class="spinner"></div>
-            <div id="loadingText">Загрузка данных...</div>
+            <div class="loading-text" id="loadingText">Загрузка...</div>
         </div>
     </div>
 

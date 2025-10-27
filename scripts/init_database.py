@@ -1,50 +1,74 @@
 #!/usr/bin/env python3
 """
-Скрипт для инициализации базы данных с популярными криптовалютами
+Скрипт инициализации БД с популярными криптовалютами
+Используется при первом запуске
 """
 
 import sys
 import os
+import logging
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-from models.database import db
+from config import POPULAR_CRYPTOS, DATABASE_URL
+from models.database import Database
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
-def init_popular_cryptos():
-    """Добавление популярных криптовалют в базу данных"""
+def init_database():
+    """Инициализация БД и загрузка популярных криптовалют"""
 
-    popular_cryptos = [
-        # Основные криптовалюты
-        {'id': 'BTC', 'symbol': 'BTC', 'name': 'Bitcoin'},
-        {'id': 'ETH', 'symbol': 'ETH', 'name': 'Ethereum'},
-        {'id': 'BNB', 'symbol': 'BNB', 'name': 'Binance Coin'},
-        {'id': 'SOL', 'symbol': 'SOL', 'name': 'Solana'},
-        {'id': 'XRP', 'symbol': 'XRP', 'name': 'Ripple'},
+    print("\n" + "=" * 70)
+    print("🗄️  ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ")
+    print("=" * 70 + "\n")
 
-        # Популярные альткойны
-        {'id': 'ADA', 'symbol': 'ADA', 'name': 'Cardano'},
-        {'id': 'DOGE', 'symbol': 'DOGE', 'name': 'Dogecoin'},
-        {'id': 'DOT', 'symbol': 'DOT', 'name': 'Polkadot'},
-        {'id': 'LTC', 'symbol': 'LTC', 'name': 'Litecoin'},
-        {'id': 'MATIC', 'symbol': 'MATIC', 'name': 'Polygon'},
+    try:
+        # Подключаемся к БД
+        db = Database(DATABASE_URL)
 
-        # Дополнительные
-        {'id': 'AVAX', 'symbol': 'AVAX', 'name': 'Avalanche'},
-        {'id': 'LINK', 'symbol': 'LINK', 'name': 'Chainlink'},
-        {'id': 'ATOM', 'symbol': 'ATOM', 'name': 'Cosmos'},
-        {'id': 'UNI', 'symbol': 'UNI', 'name': 'Uniswap'},
-        {'id': 'XLM', 'symbol': 'XLM', 'name': 'Stellar'},
-    ]
+        if not db.is_connected:
+            print("❌ Не удалось подключиться к БД")
+            print(f"   Строка подключения: {DATABASE_URL}")
+            return False
 
-    print("🔄 Инициализация базы данных...")
+        print("✅ Подключение к БД установлено\n")
 
-    for crypto in popular_cryptos:
-        db.add_cryptocurrency(crypto['id'], crypto['symbol'], crypto['name'])
-        print(f"✅ Добавлена: {crypto['symbol']} - {crypto['name']}")
+        # Добавляем популярные криптовалюты
+        print("📝 Добавление популярных криптовалют:\n")
 
-    print("🎯 База данных инициализирована!")
+        for crypto in POPULAR_CRYPTOS:
+            db.add_cryptocurrency(
+                symbol=crypto['symbol'],
+                name=crypto['name'],
+                display_name=crypto['display_name'],
+                emoji=crypto['emoji']
+            )
+            print(f"   ✅ {crypto['symbol']:10} - {crypto['name']:20} {crypto['emoji']}")
+
+        print(f"\n✅ Загружено {len(POPULAR_CRYPTOS)} криптовалют")
+
+        # Получаем и выводим все криптовалюты
+        all_cryptos = db.get_all_cryptocurrencies()
+        print(f"\n📋 Всего криптовалют в БД: {len(all_cryptos)}\n")
+
+        db.close()
+
+        print("=" * 70)
+        print("✅ ИНИЦИАЛИЗАЦИЯ УСПЕШНО ЗАВЕРШЕНА")
+        print("=" * 70 + "\n")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Ошибка: {e}\n")
+        return False
 
 
 if __name__ == '__main__':
-    init_popular_cryptos()
+    success = init_database()
+    sys.exit(0 if success else 1)
