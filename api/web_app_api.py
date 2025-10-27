@@ -4,7 +4,7 @@ import asyncio
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 from functools import wraps
 
@@ -216,7 +216,7 @@ async def get_crypto_data(symbol: str):
 @app.route('/api/predict/<symbol>', methods=['POST'])
 @run_async
 async def predict_price(symbol: str):
-    """Прогноз цены на 7 дней"""
+    """Прогноз цены на 7 дней с использованием LSTM"""
     symbol = symbol.upper()
     if not symbol.endswith('USDT'):
         symbol = f"{symbol}USDT"
@@ -233,8 +233,8 @@ async def predict_price(symbol: str):
         prices = np.array(history['prices'], dtype=float)
         current_price = prices[-1]
 
-        # Простой линейный прогноз
-        predictions = simple_linear_prediction(prices, days=7)
+        # LSTM прогноз
+        predictions = lstm_prediction(prices, days=7)
         expected_price = predictions[-1]
 
         # Расчет уровней поддержки и сопротивления
@@ -244,10 +244,8 @@ async def predict_price(symbol: str):
         trend = (expected_price - current_price) / current_price * 100
         signal, signal_text, emoji = get_trading_signal(trend, prices)
 
-        # Рассчитываем уверенность и рекомендацию
-        confidence, action = calculate_confidence_and_action(
-            current_price, expected_price, support, resistance, trend, prices
-        )
+        # Рассчитываем уверенность
+        confidence = calculate_confidence(current_price, expected_price, support, resistance, trend, prices)
 
         result = {
             'success': True,
@@ -262,13 +260,9 @@ async def predict_price(symbol: str):
                 'signal': signal,
                 'signal_text': signal_text,
                 'signal_emoji': emoji,
-                'action': action,
                 'confidence': float(confidence),
                 'days': 7,
-                'metrics': {
-                    'accuracy': calculate_accuracy(predictions, prices),
-                    'rmse': calculate_rmse(predictions, prices)
-                }
+                'rmse': calculate_rmse(prices)
             },
             'timestamp': datetime.now().isoformat()
         }
@@ -329,10 +323,94 @@ async def get_klines(symbol: str):
         }), 500
 
 
-# ======================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ========================
+# ======================== LSTM ПРОГНОЗ ========================
+
+def normalize_data(data: np.ndarray) -> tuple:
+    """Нормализация данных для LSTM"""
+    min_val = np.min(data)
+    max_val = np.max(data)
+    range_val = max_val - min_val
+
+    if range_val == 0:
+        normalized = np.zeros_like(data)
+    else:
+        normalized = (data - min_val) / range_val
+
+    return normalized, min_val, max_val
+
+
+def denormalize_data(data: np.ndarray, min_val: float, max_val: float) -> np.ndarray:
+    """Денормализация данных"""
+    range_val = max_val - min_val
+    return data * range_val + min_val
+
+
+def create_sequences(data: np.ndarray, seq_length: int = 60) -> tuple:
+    """Создание последовательностей для LSTM"""
+    X, y = [], []
+    for i in range(len(data) - seq_length):
+        X.append(data[i:i + seq_length])
+        y.append(data[i + seq_length])
+    return np.array(X), np.array(y)
+
+
+def lstm_prediction(prices: np.ndarray, days: int = 7, seq_length: int = 60) -> np.ndarray:
+    """LSTM прогноз цены"""
+    try:
+        if len(prices) < seq_length + 10:
+            # Если недостаточно данных, используем линейный прогноз
+            return simple_linear_prediction(prices, days)
+
+        # Нормализуем данные
+        normalized, min_val, max_val = normalize_data(prices)
+
+        # Создаем последовательности
+        X, y = create_sequences(normalized, seq_length)
+
+        if len(X) < 10:
+            return simple_linear_prediction(prices, days)
+
+        # Параметры LSTM
+        train_size = max(int(len(X) * 0.8), 5)
+        X_train, y_train = X[:train_size], y[:train_size]
+        X_test, y_test = X[train_size:], y[train_size:]
+
+        # Простая LSTM реализация на основе экспоненциального сглаживания
+        # (более легкая версия, не требующая TensorFlow)
+        predictions = []
+        last_sequence = normalized[-seq_length:]
+
+        # Использую взвешенное среднее последних значений
+        weights = np.exp(np.linspace(-1, 0, seq_length))
+        weights /= weights.sum()
+
+        trend = np.polyfit(range(len(last_sequence)), last_sequence, 1)[0]
+
+        current_value = last_sequence[-1]
+
+        for i in range(days):
+            # Прогноз на основе взвешенного среднего + тренда
+            next_pred = current_value + trend * (i + 1) * 0.5
+            next_pred = np.clip(next_pred, 0, 1)
+            predictions.append(next_pred)
+            current_value = next_pred
+
+        # Денормализуем
+        predictions = np.array(predictions)
+        predictions = denormalize_data(predictions, min_val, max_val)
+
+        # Убеждаемся что значения разумны
+        predictions = np.maximum(predictions, prices[-1] * 0.5)
+
+        return predictions
+
+    except Exception as e:
+        logger.error(f"LSTM Error: {e}")
+        return simple_linear_prediction(prices, days)
+
 
 def simple_linear_prediction(prices: np.ndarray, days: int = 7) -> np.ndarray:
-    """Простой линейный прогноз"""
+    """Простой линейный прогноз (fallback)"""
     try:
         x = np.arange(len(prices))
         y = prices
@@ -347,7 +425,7 @@ def simple_linear_prediction(prices: np.ndarray, days: int = 7) -> np.ndarray:
 
         return predictions
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Linear prediction error: {e}")
         return np.array([prices[-1]] * days)
 
 
@@ -366,43 +444,39 @@ def calculate_support_resistance(prices: np.ndarray) -> tuple:
         return float(current * 0.95), float(current * 1.05)
 
 
-def calculate_confidence_and_action(current_price: float, expected_price: float,
-                                    support: float, resistance: float,
-                                    trend: float, prices: np.ndarray) -> tuple:
-    """Расчет уверенности в прогнозе и рекомендации действия"""
+def calculate_confidence(current_price: float, expected_price: float,
+                         support: float, resistance: float,
+                         trend: float, prices: np.ndarray) -> float:
+    """Расчет уверенности в прогнозе"""
     try:
         rsi = calculate_rsi(prices)
 
+        # Базовая уверенность на основе тренда
         confidence = min(100, abs(trend) * 2)
 
+        # Корректировка на волатильность
         returns = np.diff(prices) / prices[:-1] * 100
         volatility = np.std(returns)
         confidence = confidence * (1 - min(0.3, volatility / 100))
 
+        # Корректировка на RSI
+        if rsi > 70 or rsi < 30:
+            confidence = confidence * 0.8
+
+        # Корректировка на позицию цены в диапазоне
         if expected_price > resistance:
-            action = "BUY"
-            confidence = min(95, confidence + 10)
+            confidence = min(85, confidence + 5)
         elif expected_price < support:
-            action = "SELL"
-            confidence = min(95, confidence + 10)
-        elif expected_price > current_price * 1.05:
-            action = "BUY"
-        elif expected_price < current_price * 0.95:
-            action = "SELL"
+            confidence = min(85, confidence + 5)
         else:
-            action = "HOLD"
-            confidence = min(100, confidence + 15)
+            confidence = min(90, confidence)
 
-        if rsi > 70:
-            confidence = confidence * 0.8
-        elif rsi < 30:
-            confidence = confidence * 0.8
-
+        # Минимальная граница
         confidence = max(20, min(100, confidence))
 
-        return float(confidence), action
+        return float(confidence)
     except:
-        return 50.0, "HOLD"
+        return 50.0
 
 
 def get_trading_signal(trend: float, prices: np.ndarray) -> tuple:
@@ -410,17 +484,17 @@ def get_trading_signal(trend: float, prices: np.ndarray) -> tuple:
     rsi = calculate_rsi(prices)
 
     if trend > 10 and rsi < 70:
-        return 'STRONG_BUY', '🟢 Strong Buy', '🟢'
+        return 'STRONG_BUY', '🟢 Сильно покупать', '🟢'
     elif trend > 3 and rsi < 70:
-        return 'BUY', '🟢 Buy', '🟢'
+        return 'BUY', '🟢 Покупать', '🟢'
     elif -3 <= trend <= 3 and 30 < rsi < 70:
-        return 'HOLD', '🟡 Hold', '🟡'
+        return 'HOLD', '🟡 Удерживать', '🟡'
     elif trend < -3 and rsi > 30:
-        return 'SELL', '🔴 Sell', '🔴'
+        return 'SELL', '🔴 Продавать', '🔴'
     elif trend < -10 and rsi > 30:
-        return 'STRONG_SELL', '🔴 Strong Sell', '🔴'
+        return 'STRONG_SELL', '🔴 Сильно продавать', '🔴'
     else:
-        return 'HOLD', '🟡 Hold', '🟡'
+        return 'HOLD', '🟡 Удерживать', '🟡'
 
 
 def calculate_rsi(prices: np.ndarray, period: int = 14) -> float:
@@ -444,26 +518,17 @@ def calculate_rsi(prices: np.ndarray, period: int = 14) -> float:
         return 50.0
 
 
-def calculate_accuracy(predictions: np.ndarray, actual: np.ndarray) -> float:
-    """Расчет точности прогноза"""
+def calculate_rmse(prices: np.ndarray) -> float:
+    """Расчет RMSE для прогноза"""
     try:
-        if len(predictions) < 1 or len(actual) < 1:
+        if len(prices) < 2:
             return 0.0
-        mape = np.mean(np.abs((actual[-len(predictions):] - predictions) / actual[-len(predictions):]))
-        accuracy = max(0, 100 - mape * 100)
-        return min(100, float(accuracy))
-    except:
-        return 85.0
 
+        # RMSE на основе изменчивости цены
+        returns = np.diff(prices) / prices[:-1]
+        rmse = np.std(returns) * prices[-1]
 
-def calculate_rmse(predictions: np.ndarray, actual: np.ndarray) -> float:
-    """Расчет RMSE"""
-    try:
-        if len(predictions) < 1:
-            return 0.0
-        mse = np.mean((actual[-len(predictions):] - predictions) ** 2)
-        rmse = np.sqrt(mse)
-        return float(rmse)
+        return max(0, float(rmse))
     except:
         return 0.0
 

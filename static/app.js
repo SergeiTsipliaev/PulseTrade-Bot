@@ -39,7 +39,7 @@ function setupSearch() {
             return;
         }
 
-        searchResults.innerHTML = '<div class="search-result-item">🔍 Searching...</div>';
+        searchResults.innerHTML = '<div class="search-result-item">🔍 Поиск...</div>';
         searchResults.classList.add('show');
 
         searchTimeout = setTimeout(() => {
@@ -66,11 +66,11 @@ async function performSearch(query) {
         if (data.success && data.data.length > 0) {
             displaySearchResults(data.data);
         } else {
-            searchResults.innerHTML = '<div class="search-result-item">Not found</div>';
+            searchResults.innerHTML = '<div class="search-result-item">Не найдено</div>';
         }
     } catch (error) {
         console.error('Error:', error);
-        searchResults.innerHTML = '<div class="search-result-item">Search error</div>';
+        searchResults.innerHTML = '<div class="search-result-item">Ошибка поиска</div>';
     }
 }
 
@@ -92,7 +92,8 @@ async function selectCryptoFromSearch(symbol) {
     document.getElementById('searchResults').classList.remove('show');
     document.getElementById('searchInput').value = '';
 
-    showLoading('Loading...');
+    showLoading('Загрузка...');
+    hidePrediction(); // Скрываем старый прогноз
     await loadCryptoData(symbol);
 }
 
@@ -115,7 +116,8 @@ async function renderCryptoGrid() {
                 card.onclick = () => {
                     selectedCrypto = crypto.symbol;
                     updateCryptoGrid();
-                    showLoading('Loading...');
+                    showLoading('Загрузка...');
+                    hidePrediction(); // Скрываем старый прогноз
                     loadCryptoData(crypto.symbol);
                 };
 
@@ -162,11 +164,11 @@ async function loadCryptoData(symbol) {
             displayCryptoData(data.data);
             document.getElementById('predictBtn').classList.remove('hidden');
         } else {
-            showError('Error: ' + (data.error || 'Unknown error'));
+            showError('Ошибка: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
         console.error('Error:', error);
-        showError('Connection error');
+        showError('Ошибка подключения');
     } finally {
         hideLoading();
     }
@@ -218,16 +220,18 @@ function displayPriceChart(history) {
         data: {
             labels: labels,
             datasets: [{
-                label: 'Price (USDT)',
+                label: 'Цена (USDT)',
                 data: history.prices,
                 borderColor: '#667eea',
                 backgroundColor: 'rgba(102, 126, 234, 0.1)',
                 tension: 0.4,
                 fill: true,
                 pointRadius: 0,
-                pointHoverRadius: 4,
-                borderWidth: 2,
-                pointBackgroundColor: '#667eea'
+                pointHoverRadius: 6,
+                borderWidth: 2.5,
+                pointBackgroundColor: '#667eea',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2
             }]
         },
         options: {
@@ -239,18 +243,21 @@ function displayPriceChart(history) {
                     position: 'top',
                     labels: {
                         padding: 15,
-                        font: { size: 12 }
+                        font: { size: 12, weight: '600' },
+                        usePointStyle: true
                     }
                 },
                 tooltip: {
                     mode: 'index',
                     intersect: false,
                     backgroundColor: 'rgba(0,0,0,0.8)',
-                    padding: 10,
+                    padding: 12,
                     cornerRadius: 8,
+                    titleFont: { size: 13, weight: 'bold' },
+                    bodyFont: { size: 12 },
                     callbacks: {
                         label: (context) => {
-                            return `Price: $${formatPrice(context.parsed.y)}`;
+                            return `  Цена: $${formatPrice(context.parsed.y)}`;
                         }
                     }
                 }
@@ -258,13 +265,23 @@ function displayPriceChart(history) {
             scales: {
                 y: {
                     beginAtZero: false,
+                    grid: {
+                        color: 'rgba(0,0,0,0.05)',
+                        drawBorder: false
+                    },
                     ticks: {
-                        callback: (value) => `$${formatNumber(value)}`
+                        callback: (value) => `$${formatNumber(value)}`,
+                        font: { size: 11 }
                     }
                 },
                 x: {
+                    grid: {
+                        display: false,
+                        drawBorder: false
+                    },
                     ticks: {
-                        maxTicksLimit: 8
+                        maxTicksLimit: 8,
+                        font: { size: 11 }
                     }
                 }
             }
@@ -278,15 +295,15 @@ function displayPriceChart(history) {
 
 async function makePrediction() {
     if (!selectedCrypto) {
-        showError('Select crypto first');
+        showError('Сначала выберите криптовалюту');
         return;
     }
 
     const btn = document.getElementById('predictBtn');
     btn.disabled = true;
-    btn.textContent = '🧠 Learning...';
+    btn.textContent = '🧠 Обучение...';
 
-    showLoading('Processing...');
+    showLoading('Обработка...');
 
     try {
         const response = await fetch(`${API_URL}/predict/${selectedCrypto}`, {
@@ -299,15 +316,15 @@ async function makePrediction() {
         if (data.success) {
             displayPrediction(data.data);
         } else {
-            showError('Error: ' + (data.error || 'Unknown error'));
+            showError('Ошибка: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
         console.error('Error:', error);
-        showError('Connection error');
+        showError('Ошибка подключения');
     } finally {
         hideLoading();
         btn.disabled = false;
-        btn.textContent = '🔮 Predict 7 days';
+        btn.textContent = '🔮 Прогноз на 7 дней';
     }
 }
 
@@ -331,34 +348,26 @@ function displayPrediction(prediction) {
     changeEl.textContent = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
     changeEl.className = change > 0 ? 'predicted-change positive' : 'predicted-change negative';
 
-    document.getElementById('accuracy').textContent = prediction.metrics.accuracy.toFixed(1) + '%';
-    document.getElementById('rmse').textContent = `$${formatPrice(prediction.metrics.rmse)}`;
-
-    // Новые данные
     document.getElementById('expectedPrice').textContent = `$${formatPrice(prediction.expected_price)}`;
     document.getElementById('support').textContent = `$${formatPrice(prediction.support)}`;
     document.getElementById('resistance').textContent = `$${formatPrice(prediction.resistance)}`;
-    document.getElementById('actionValue').textContent = prediction.action;
+
+    // Уверенность
     document.getElementById('confidence').textContent = `${prediction.confidence.toFixed(0)}%`;
-    
-    // Обновляем ширину confidence bar
     document.getElementById('confidenceFill').style.width = `${prediction.confidence}%`;
 
-    const actionEl = document.getElementById('actionValue');
-    if (prediction.action === 'BUY') {
-        actionEl.style.color = '#10b981';
-    } else if (prediction.action === 'SELL') {
-        actionEl.style.color = '#ef4444';
-    } else {
-        actionEl.style.color = '#f59e0b';
-    }
+    // RMSE
+    document.getElementById('rmse').textContent = `$${formatPrice(prediction.rmse)}`;
 
+    // Индикаторы
     if (currentCryptoData && currentCryptoData.indicators) {
         displayPredictionIndicators(currentCryptoData.indicators);
     }
 
+    // График прогноза
     displayPredictionChart(prediction);
 
+    // Скролл к прогнозу
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -388,12 +397,12 @@ function displayPredictionIndicators(indicators) {
             value: `$${formatPrice(indicators.ma_50)}`
         },
         {
-            label: 'Volatility',
+            label: 'Волатильность',
             value: `${indicators.volatility.toFixed(2)}%`,
             color: indicators.volatility > 5 ? '#ef4444' : '#10b981'
         },
         {
-            label: 'Trend',
+            label: 'Тренд',
             value: `${indicators.trend_strength > 0 ? '+' : ''}${indicators.trend_strength.toFixed(1)}%`,
             color: indicators.trend_strength > 0 ? '#10b981' : '#ef4444'
         }
@@ -423,7 +432,10 @@ function displayPredictionChart(prediction) {
         predictionChart.destroy();
     }
 
-    const labels = Array.from({ length: prediction.days }, (_, i) => `Day ${i + 1}`);
+    const labels = Array.from({ length: prediction.days }, (_, i) => `День ${i + 1}`);
+
+    // Градиент для кривой
+    const gradient = ctx.getContext ? ctx.getContext('2d').createLinearGradient(0, 0, 0, 400) : null;
 
     predictionChart = new Chart(ctx, {
         type: 'line',
@@ -431,47 +443,118 @@ function displayPredictionChart(prediction) {
             labels: labels,
             datasets: [
                 {
-                    label: 'Prediction',
+                    label: 'Прогноз цены',
                     data: prediction.predictions,
                     borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    tension: 0.4,
+                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                    tension: 0.45,
                     fill: true,
-                    pointRadius: 4,
+                    pointRadius: 5,
                     pointBackgroundColor: '#10b981',
-                    borderWidth: 2
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2.5,
+                    pointHoverRadius: 7,
+                    borderWidth: 3,
+                    borderCapStyle: 'round',
+                    borderJoinStyle: 'round'
+                },
+                {
+                    label: 'Текущая цена',
+                    data: Array(prediction.days).fill(prediction.current_price),
+                    borderColor: '#667eea',
+                    borderDash: [5, 5],
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: false
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
             plugins: {
                 legend: {
                     display: true,
-                    position: 'top'
+                    position: 'top',
+                    labels: {
+                        padding: 15,
+                        font: { size: 12, weight: '600' },
+                        usePointStyle: true,
+                        pointStyle: 'circle'
+                    }
                 },
                 tooltip: {
                     mode: 'index',
                     intersect: false,
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    padding: 12,
+                    cornerRadius: 10,
+                    titleFont: { size: 13, weight: 'bold' },
+                    bodyFont: { size: 12 },
+                    borderColor: '#10b981',
+                    borderWidth: 2,
                     callbacks: {
                         label: (context) => {
-                            return `${context.dataset.label}: $${formatPrice(context.parsed.y)}`;
+                            const value = context.parsed.y;
+                            return `  ${context.dataset.label}: $${formatPrice(value)}`;
+                        },
+                        afterLabel: (context) => {
+                            if (context.datasetIndex === 0) {
+                                const current = prediction.current_price;
+                                const diff = value - current;
+                                const percent = (diff / current * 100).toFixed(2);
+                                return `  Изменение: ${diff > 0 ? '+' : ''}${percent}%`;
+                            }
                         }
                     }
+                },
+                filler: {
+                    propagate: true
                 }
             },
             scales: {
                 y: {
+                    beginAtZero: false,
+                    grid: {
+                        color: 'rgba(0,0,0,0.05)',
+                        drawBorder: false
+                    },
                     ticks: {
-                        callback: (value) => `$${formatNumber(value)}`
+                        callback: (value) => `$${formatNumber(value)}`,
+                        font: { size: 11 }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false,
+                        drawBorder: false
+                    },
+                    ticks: {
+                        font: { size: 11 }
                     }
                 }
             }
         }
     });
 
-    ctx.style.height = '300px';
+    ctx.style.height = '350px';
+}
+
+// ======================== ФУНКЦИЯ СКРЫТИЯ ПРОГНОЗА ========================
+
+function hidePrediction() {
+    const section = document.getElementById('predictionSection');
+    section.classList.remove('show');
+
+    // Очищаем графики
+    if (predictionChart) {
+        predictionChart.destroy();
+        predictionChart = null;
+    }
 }
 
 // ======================== ОБРАБОТЧИКИ ========================
@@ -482,7 +565,7 @@ function setupEventListeners() {
 
 // ======================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ========================
 
-function showLoading(text = 'Loading...') {
+function showLoading(text = 'Загрузка...') {
     const loading = document.getElementById('loading');
     document.getElementById('loadingText').textContent = text;
     loading.classList.add('show');
