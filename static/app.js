@@ -331,6 +331,7 @@ function displayPrediction(prediction) {
     changeEl.textContent = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
     changeEl.className = change > 0 ? 'predicted-change positive' : 'predicted-change negative';
 
+    document.getElementById('accuracy').textContent = prediction.metrics.accuracy.toFixed(1) + '%';
     document.getElementById('rmse').textContent = `$${formatPrice(prediction.metrics.rmse)}`;
 
     // Новые данные
