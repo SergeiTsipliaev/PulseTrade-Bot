@@ -33,7 +33,7 @@ EPOCHS = 50
 BATCH_SIZE = 32
 
 # ======================== CACHE SETTINGS ========================
-CACHE_TTL = 300  # 5 minutes
+CACHE_TTL = 60  # 5 minutes
 PRICE_HISTORY_DAYS = 90
 
 # ======================== POPULAR CRYPTOS (BYBIT SYMBOLS) ========================
@@ -42,8 +42,8 @@ POPULAR_CRYPTOS = [
     {'symbol': 'ETHUSDT', 'name': 'Ethereum', 'display_name': 'ETH', 'emoji': 'Ξ'},
     {'symbol': 'BNBUSDT', 'name': 'Binance Coin', 'display_name': 'BNB', 'emoji': '🔶'},
     {'symbol': 'SOLUSDT', 'name': 'Solana', 'display_name': 'SOL', 'emoji': '◎'},
-    {'symbol': 'XRPUSDT', 'name': 'Ripple', 'display_name': 'XRP', 'emoji': '✕'},
-    {'symbol': 'ADAUSDT', 'name': 'Cardano', 'display_name': 'ADA', 'emoji': '₳'},
+    {'symbol': 'XRPUSDT', 'name': 'Ripple', 'display_name': 'XRP', 'emoji': '✘'},
+    {'symbol': 'ADAUSDT', 'name': 'Cardano', 'display_name': 'ADA', 'emoji': '✴'},
 ]
 
 # ======================== API LIMITS ========================

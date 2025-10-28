@@ -1,14 +1,19 @@
 from aiogram import Router, F
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, CallbackQuery
 from aiogram.filters import Command
+import logging
+
 from config import WEB_APP_URL
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
 
 @router.message(Command("start"))
-async def cmd_start(message: Message):
+async def cmd_start(message: Message) -> None:
     """Обработчик команды /start"""
+    
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text="📱 Открыть приложение",
@@ -30,12 +35,41 @@ async def cmd_start(message: Message):
         reply_markup=keyboard,
         parse_mode="HTML"
     )
+    
+    logger.info(f"✅ Пользователь {message.from_user.id} запустил /start")
 
 
-@router.callback_query(F.data == "about")
-async def about_callback(callback):
-    """Информация о приложении"""
-    await callback.message.answer(
+@router.message(Command("help"))
+async def cmd_help(message: Message) -> None:
+    """Обработчик команды /help"""
+    
+    help_text = (
+        "📱 <b>Crypto LSTM Predictor</b>\n\n"
+        "<b>Доступные команды:</b>\n\n"
+        "/start - Запустить бота\n"
+        "/help - Справка\n"
+        "/about - Информация о приложении\n\n"
+        "<b>Возможности:</b>\n"
+        "• 📈 Прогноз цен на 1-7 дней\n"
+        "• 🧠 LSTM нейронная сеть\n"
+        "• 📊 Технический анализ (RSI, MA, волатильность)\n"
+        "• 📉 Интерактивные графики\n"
+        "• 🎯 Торговые сигналы\n"
+        "• 📱 Адаптивный дизайн\n\n"
+        "<b>Поддерживаемые криптовалюты:</b>\n"
+        "Bitcoin (BTC), Ethereum (ETH), Binance Coin (BNB), "
+        "Solana (SOL), Ripple (XRP)"
+    )
+    
+    await message.answer(help_text, parse_mode="HTML")
+    logger.info(f"✅ Пользователь {message.from_user.id} запросил /help")
+
+
+@router.message(Command("about"))
+async def cmd_about(message: Message) -> None:
+    """Обработчик команды /about"""
+    
+    about_text = (
         "📱 <b>Crypto LSTM Predictor</b>\n\n"
         "<b>Возможности:</b>\n"
         "• 📈 Прогноз цен на 1-7 дней\n"
@@ -47,7 +81,51 @@ async def about_callback(callback):
         "<b>Поддерживаемые криптовалюты:</b>\n"
         "Bitcoin (BTC), Ethereum (ETH), Binance Coin (BNB), "
         "Solana (SOL), Ripple (XRP)\n\n"
-        "<b>Разработчик:</b> @your_username",
-        parse_mode="HTML"
+        "<b>Разработчик:</b> @your_username\n"
+        "<b>Версия:</b> 1.0.0"
     )
-    await callback.answer()
+    
+    await message.answer(about_text, parse_mode="HTML")
+    logger.info(f"✅ Пользователь {message.from_user.id} запросил /about")
+
+
+@router.callback_query(F.data == "about")
+async def about_callback(callback: CallbackQuery) -> None:
+    """Информация о приложении (из инлайн кнопки)"""
+    
+    # ⚠️ ВАЖНО: callback.answer() ДОЛЖЕН БЫТЬ ПЕРВЫМ!
+    # Это убирает "часики" загрузки в Telegram
+    await callback.answer("ℹ️ Загружение информации...", show_alert=False)
+    
+    about_text = (
+        "📱 <b>Crypto LSTM Predictor</b>\n\n"
+        "<b>Возможности:</b>\n"
+        "• 📈 Прогноз цен на 1-7 дней\n"
+        "• 🧠 LSTM нейронная сеть\n"
+        "• 📊 Технический анализ (RSI, MA, волатильность)\n"
+        "• 📉 Интерактивные графики\n"
+        "• 🎯 Торговые сигналы\n"
+        "• 📱 Адаптивный дизайн\n\n"
+        "<b>Поддерживаемые криптовалюты:</b>\n"
+        "Bitcoin (BTC), Ethereum (ETH), Binance Coin (BNB), "
+        "Solana (SOL), Ripple (XRP)\n\n"
+        "<b>Разработчик:</b> @your_username"
+    )
+    
+    # Отправляем новое сообщение
+    await callback.message.answer(about_text, parse_mode="HTML")
+    
+    logger.info(f"✅ Пользователь {callback.from_user.id} нажал кнопку 'О приложении'")
+
+
+@router.message()
+async def echo_handler(message: Message) -> None:
+    """Обработчик для всех остальных сообщений"""
+    
+    response = (
+        "👋 Привет! Я не понимаю эту команду.\n\n"
+        "Введите /help для справки."
+    )
+    
+    await message.answer(response)
+    logger.info(f"ℹ️ Пользователь {message.from_user.id} отправил неизвестную команду: {message.text}")

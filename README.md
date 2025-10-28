@@ -26,7 +26,7 @@
 ### 1. Локальная разработка (без Docker)
 
 #### Требования:
-- Python 3.10+
+- Python 3.13+
 - PostgreSQL 15+
 - pip
 
@@ -67,7 +67,7 @@ createdb cryptobot  # Если БД не существует
 python scripts/init_database.py
 
 # 7. Запустите приложение
-python -m api.web_app_api
+python3 -m api.web_app_api
 ```
 
 Откройте: **http://localhost:5000**
@@ -346,25 +346,15 @@ const predictResponse = await fetch('/api/predict/BTCUSDT', {
 const prediction = await predictResponse.json();
 ```
 
-### cURL
-
-```bash
-# Здоровье приложения
-curl http://localhost:5000/api/health
-
-# Поиск
-curl "http://localhost:5000/api/search?q=eth"
-
-# Данные
-curl http://localhost:5000/api/crypto/ETHUSDT
-
-# Прогноз
-curl -X POST http://localhost:5000/api/predict/ETHUSDT
-```
-
 ## 🚀 Деплой
 
-### Render.com (рекомендуется)
+### ngrok
+
+1. brew install ngrok - установить в корень ноутбука
+2. ngrok http 5000
+
+
+### Render.com
 
 1. Форкните репозиторий на GitHub
 2. Создайте аккаунт на [render.com](https://render.com)
@@ -395,18 +385,6 @@ MIT License - свободно используйте в личных и ком�
 
 ## 👨‍💻 Разработка
 
-### Локальное тестирование
-
-```bash
-# Запустите тесты (если они есть)
-pytest
-
-# Проверьте импорты
-python test_imports.py
-
-# Проверьте подключение к БД
-python -c "from models.database import db; print(db.is_connected)"
-```
 
 ### Code Style
 
@@ -417,19 +395,6 @@ pip install flake8
 flake8 .
 ```
 
-## 🙋‍♀️ Поддержка
-
-Если у вас есть вопросы:
-
-1. Проверьте раздел Troubleshooting
-2. Посмотрите логи: `docker-compose logs api`
-3. Создайте Issue на GitHub
-
-## 🌟 Спасибо
-
-Спасибо за использование этого проекта! Если понравилось - поставьте ⭐ на GitHub.
-
----
 
 **Версия:** 2.0.0 (Bybit API Edition)  
 **Последнее обновление:** Октябрь 2025
