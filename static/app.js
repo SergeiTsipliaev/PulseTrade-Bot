@@ -93,7 +93,7 @@ async function selectCryptoFromSearch(symbol) {
     document.getElementById('searchInput').value = '';
 
     showLoading('Загрузка...');
-    hidePrediction(); // Скрываем старый прогноз
+    hidePrediction();
     await loadCryptoData(symbol);
 }
 
@@ -117,7 +117,7 @@ async function renderCryptoGrid() {
                     selectedCrypto = crypto.symbol;
                     updateCryptoGrid();
                     showLoading('Загрузка...');
-                    hidePrediction(); // Скрываем старый прогноз
+                    hidePrediction();
                     loadCryptoData(crypto.symbol);
                 };
 
@@ -352,22 +352,17 @@ function displayPrediction(prediction) {
     document.getElementById('support').textContent = `$${formatPrice(prediction.support)}`;
     document.getElementById('resistance').textContent = `$${formatPrice(prediction.resistance)}`;
 
-    // Уверенность
     document.getElementById('confidence').textContent = `${prediction.confidence.toFixed(0)}%`;
     document.getElementById('confidenceFill').style.width = `${prediction.confidence}%`;
 
-    // RMSE
     document.getElementById('rmse').textContent = `$${formatPrice(prediction.rmse)}`;
 
-    // Индикаторы
     if (currentCryptoData && currentCryptoData.indicators) {
         displayPredictionIndicators(currentCryptoData.indicators);
     }
 
-    // График прогноза
     displayPredictionChart(prediction);
 
-    // Скролл к прогнозу
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -434,8 +429,9 @@ function displayPredictionChart(prediction) {
 
     const labels = Array.from({ length: prediction.days }, (_, i) => `День ${i + 1}`);
 
-    // Градиент для кривой
-    const gradient = ctx.getContext ? ctx.getContext('2d').createLinearGradient(0, 0, 0, 400) : null;
+    // Определяем цвет в зависимости от тренда
+    const trendColor = prediction.predicted_change > 0 ? '#60D102' : '#E1221D';
+    const bgColor = prediction.predicted_change > 0 ? 'rgba(6, 182, 212, 0.15)' : 'rgba(239, 68, 68, 0.15)';
 
     predictionChart = new Chart(ctx, {
         type: 'line',
@@ -445,15 +441,15 @@ function displayPredictionChart(prediction) {
                 {
                     label: 'Прогноз цены',
                     data: prediction.predictions,
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                    borderColor: trendColor,
+                    backgroundColor: bgColor,
                     tension: 0.45,
                     fill: true,
-                    pointRadius: 5,
-                    pointBackgroundColor: '#10b981',
+                    pointRadius: 6,
+                    pointBackgroundColor: trendColor,
                     pointBorderColor: '#fff',
                     pointBorderWidth: 2.5,
-                    pointHoverRadius: 7,
+                    pointHoverRadius: 8,
                     borderWidth: 3,
                     borderCapStyle: 'round',
                     borderJoinStyle: 'round'
@@ -488,23 +484,28 @@ function displayPredictionChart(prediction) {
                     }
                 },
                 tooltip: {
+                    enabled: true,
                     mode: 'index',
                     intersect: false,
-                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    backgroundColor: 'rgba(0,0,0,0.9)',
                     padding: 12,
                     cornerRadius: 10,
                     titleFont: { size: 13, weight: 'bold' },
                     bodyFont: { size: 12 },
-                    borderColor: '#10b981',
+                    borderColor: trendColor,
                     borderWidth: 2,
+                    displayColors: true,
                     callbacks: {
+                        title: (context) => context[0].label,
                         label: (context) => {
                             const value = context.parsed.y;
+                            if (value === null) return '';
                             return `  ${context.dataset.label}: $${formatPrice(value)}`;
                         },
                         afterLabel: (context) => {
                             if (context.datasetIndex === 0) {
                                 const current = prediction.current_price;
+                                const value = context.parsed.y;
                                 const diff = value - current;
                                 const percent = (diff / current * 100).toFixed(2);
                                 return `  Изменение: ${diff > 0 ? '+' : ''}${percent}%`;
@@ -544,13 +545,10 @@ function displayPredictionChart(prediction) {
     ctx.style.height = '350px';
 }
 
-// ======================== ФУНКЦИЯ СКРЫТИЯ ПРОГНОЗА ========================
-
 function hidePrediction() {
     const section = document.getElementById('predictionSection');
     section.classList.remove('show');
 
-    // Очищаем графики
     if (predictionChart) {
         predictionChart.destroy();
         predictionChart = null;
