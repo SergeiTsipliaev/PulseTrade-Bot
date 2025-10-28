@@ -4,10 +4,11 @@ let predictionChart = null;
 let currentCryptoData = null;
 let priceUpdateInterval = null;
 let selectedCrypto = null;
-let currentTimeframe = '60'; // Текущий таймфрейм (по умолчанию 1h)
+let currentTimeframe = '60';
+let chartType = 'line';
+let currentKlines = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Получаем символ из URL параметров
     const urlParams = new URLSearchParams(window.location.search);
     const symbol = urlParams.get('symbol');
 
@@ -27,13 +28,11 @@ function setupTimeframeMenu() {
     const menu = document.getElementById('timeframeMenu');
     const options = document.querySelectorAll('.timeframe-option');
 
-    // Открыть/закрыть меню
     btn.onclick = (e) => {
         e.stopPropagation();
         menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
     };
 
-    // Выбор таймфрейма
     options.forEach(option => {
         option.onclick = () => {
             const interval = option.dataset.interval;
@@ -43,12 +42,10 @@ function setupTimeframeMenu() {
             btn.textContent = `${label} ▼`;
             menu.style.display = 'none';
             
-            // Загружаем новые свечи
             loadKlines(selectedCrypto, interval);
         };
     });
 
-    // Закрыть меню при клике вне его
     document.addEventListener('click', (e) => {
         if (!btn.contains(e.target) && !menu.contains(e.target)) {
             menu.style.display = 'none';
@@ -58,10 +55,19 @@ function setupTimeframeMenu() {
 
 function setupEventListeners() {
     document.getElementById('predictBtn').onclick = makePrediction;
+    
+    document.getElementById('chartTypeBtn').onclick = () => {
+        chartType = chartType === 'line' ? 'candlestick' : 'line';
+        const btn = document.getElementById('chartTypeBtn');
+        btn.textContent = chartType === 'line' ? '📈 Линия' : '📊 Свечи';
+        
+        if (currentKlines.length > 0) {
+            displayPriceChartFromKlines(currentKlines, currentTimeframe);
+        }
+    };
 }
 
 async function loadCryptoData(symbol) {
-    // Останавливаем предыдущее обновление
     if (priceUpdateInterval) {
         clearInterval(priceUpdateInterval);
         priceUpdateInterval = null;
@@ -77,7 +83,6 @@ async function loadCryptoData(symbol) {
             currentCryptoData = data.data;
             displayCryptoData(data.data);
 
-            // Запустить реалтайм обновление каждые 10 секунд
             priceUpdateInterval = setInterval(() => {
                 updatePriceRealtime(symbol);
             }, 10000);
@@ -99,12 +104,9 @@ async function updatePriceRealtime(symbol) {
 
         if (data.success && data.data) {
             const newData = data.data;
-
-            // Обновляем цену
             const currentPrice = newData.current.price;
             document.getElementById('currentPrice').textContent = `$${formatPrice(currentPrice)}`;
 
-            // Обновляем изменение
             const change = newData.current.change_24h || 0;
             const changeEl = document.getElementById('priceChange');
             const changeIcon = change >= 0 ? '↑' : '↓';
@@ -114,26 +116,8 @@ async function updatePriceRealtime(symbol) {
             changeEl.style.color = changeColor;
             changeEl.style.background = changeColor + '20';
 
-            // Обновляем high/low
             document.getElementById('high24h').textContent = `$${formatPrice(newData.current.high_24h)}`;
             document.getElementById('low24h').textContent = `$${formatPrice(newData.current.low_24h)}`;
-
-            // Обновляем график
-            if (priceChart && newData.history && newData.history.prices) {
-                const newPrices = newData.history.prices;
-                const newTimestamps = newData.history.timestamps;
-
-                const maxPoints = 90;
-                const startIdx = Math.max(0, newPrices.length - maxPoints);
-
-                priceChart.data.datasets[0].data = newPrices.slice(startIdx);
-                priceChart.data.labels = newTimestamps.slice(startIdx).map(ts => {
-                    const date = new Date(ts);
-                    return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-                });
-
-                priceChart.update('none');
-            }
 
             currentCryptoData = newData;
         }
@@ -143,7 +127,7 @@ async function updatePriceRealtime(symbol) {
 }
 
 function displayCryptoData(data) {
-    document.getElementById('cryptoName').textContent = data.symbol.slice(0, -4); // Убираем USDT
+    document.getElementById('cryptoName').textContent = data.symbol.slice(0, -4);
     document.getElementById('cryptoSymbol').textContent = data.symbol;
 
     const currentPrice = data.current.price;
@@ -161,21 +145,48 @@ function displayCryptoData(data) {
     document.getElementById('high24h').textContent = `$${formatPrice(data.current.high_24h)}`;
     document.getElementById('low24h').textContent = `$${formatPrice(data.current.low_24h)}`;
 
-    // Загружаем klines вместо истории цен
     loadKlines(data.symbol, currentTimeframe);
 }
 
-function displayPriceChart(history) {
+async function loadKlines(symbol, interval) {
+    try {
+        const response = await fetch(`${API_URL}/klines/${symbol}?interval=${interval}&limit=100`);
+        const data = await response.json();
+
+        if (data.success && data.data && data.data.length > 0) {
+            currentKlines = data.data;
+            displayPriceChartFromKlines(data.data, interval);
+        }
+    } catch (error) {
+        console.error('Error loading klines:', error);
+    }
+}
+
+function displayPriceChartFromKlines(klines, interval) {
     const ctx = document.getElementById('priceChart');
 
     if (priceChart) {
         priceChart.destroy();
     }
 
-    const labels = history.timestamps.map(ts => {
-        const date = new Date(ts);
-        return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+    if (chartType === 'line') {
+        displayLineChart(klines, interval, ctx);
+    } else {
+        displayCandlestickChart(klines, interval, ctx);
+    }
+}
+
+function displayLineChart(klines, interval, ctx) {
+    const labels = klines.map(kline => {
+        const date = new Date(kline.timestamp);
+        if (['D', 'W', 'M'].includes(interval)) {
+            return date.toLocaleDateString('ru-RU');
+        } else {
+            return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
     });
+
+    const closePrices = klines.map(k => k.close);
 
     priceChart = new Chart(ctx, {
         type: 'line',
@@ -183,7 +194,7 @@ function displayPriceChart(history) {
             labels: labels,
             datasets: [{
                 label: 'Цена (USDT)',
-                data: history.prices,
+                data: closePrices,
                 borderColor: '#667eea',
                 backgroundColor: 'rgba(102, 126, 234, 0.1)',
                 tension: 0.4,
@@ -251,34 +262,9 @@ function displayPriceChart(history) {
     ctx.style.height = '250px';
 }
 
-// Загрузить свечи (klines) с API
-async function loadKlines(symbol, interval) {
-    try {
-        const response = await fetch(`${API_URL}/klines/${symbol}?interval=${interval}&limit=200`);
-        const data = await response.json();
-
-        if (data.success && data.data && data.data.length > 0) {
-            displayPriceChartFromKlines(data.data, interval);
-        } else {
-            console.error('No klines data');
-        }
-    } catch (error) {
-        console.error('Error loading klines:', error);
-    }
-}
-
-// Отобразить график на основе klines
-function displayPriceChartFromKlines(klines, interval) {
-    const ctx = document.getElementById('priceChart');
-
-    if (priceChart) {
-        priceChart.destroy();
-    }
-
-    // Форматируем временные метки в зависимости от таймфрейма
+function displayCandlestickChart(klines, interval, ctx) {
     const labels = klines.map(kline => {
         const date = new Date(kline.timestamp);
-        
         if (['D', 'W', 'M'].includes(interval)) {
             return date.toLocaleDateString('ru-RU');
         } else {
@@ -288,6 +274,28 @@ function displayPriceChartFromKlines(klines, interval) {
 
     const closePrices = klines.map(k => k.close);
 
+    let tooltipElement = document.getElementById('candleTooltip');
+    if (!tooltipElement) {
+        tooltipElement = document.createElement('div');
+        tooltipElement.id = 'candleTooltip';
+        tooltipElement.style.cssText = `
+            position: fixed;
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            display: none;
+            z-index: 1000;
+            border: 1px solid #333;
+            pointer-events: none;
+            min-width: 140px;
+            line-height: 1.7;
+        `;
+        document.body.appendChild(tooltipElement);
+    }
+
     priceChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -295,46 +303,25 @@ function displayPriceChartFromKlines(klines, interval) {
             datasets: [{
                 label: 'Цена (USDT)',
                 data: closePrices,
-                borderColor: '#667eea',
-                backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                tension: 0.4,
-                fill: true,
+                borderColor: 'transparent',
+                backgroundColor: 'transparent',
                 pointRadius: 0,
-                pointHoverRadius: 6,
-                borderWidth: 2.5,
-                pointBackgroundColor: '#667eea',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2
+                fill: false
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                mode: 'nearest',
+                intersect: false
+            },
             plugins: {
                 legend: {
-                    display: true,
-                    position: 'top',
-                    labels: {
-                        padding: 15,
-                        font: { size: 12, weight: '600' },
-                        usePointStyle: true
-                    }
+                    display: false
                 },
                 tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    padding: 12,
-                    cornerRadius: 8,
-                    titleFont: { size: 13, weight: 'bold' },
-                    bodyFont: { size: 12 },
-                    callbacks: {
-                        label: (context) => `  Цена: $${formatPrice(context.parsed.y)}`,
-                        afterLabel: (context) => {
-                            const kline = klines[context.dataIndex];
-                            return `  Open: $${formatPrice(kline.open)}\n  High: $${formatPrice(kline.high)}\n  Low: $${formatPrice(kline.low)}`;
-                        }
-                    }
+                    enabled: false
                 }
             },
             scales: {
@@ -360,7 +347,94 @@ function displayPriceChartFromKlines(klines, interval) {
                     }
                 }
             }
-        }
+        },
+        plugins: [{
+            id: 'candlestickPlugin',
+            afterDraw(chart) {
+                const { ctx: canvasCtx, chartArea, scales } = chart;
+                const xScale = scales.x;
+                const yScale = scales.y;
+
+                canvasCtx.save();
+
+                klines.forEach((kline, idx) => {
+                    const x = xScale.getPixelForValue(idx);
+                    const highY = yScale.getPixelForValue(kline.high);
+                    const lowY = yScale.getPixelForValue(kline.low);
+                    const openY = yScale.getPixelForValue(kline.open);
+                    const closeY = yScale.getPixelForValue(kline.close);
+
+                    const isGreen = kline.close >= kline.open;
+                    const color = isGreen ? '#10b981' : '#ef4444';
+                    const bodyTop = Math.min(openY, closeY);
+                    const bodyHeight = Math.abs(closeY - openY) || 3;
+                    const bodyWidth = 16;
+
+                    // Wick (тень/фитиль)
+                    canvasCtx.strokeStyle = color;
+                    canvasCtx.lineWidth = 2;
+                    canvasCtx.beginPath();
+                    canvasCtx.moveTo(x, highY);
+                    canvasCtx.lineTo(x, lowY);
+                    canvasCtx.stroke();
+
+                    // Body (тело свечи)
+                    canvasCtx.fillStyle = color;
+                    canvasCtx.globalAlpha = 1;
+                    canvasCtx.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+                    
+                    canvasCtx.globalAlpha = 1;
+                });
+
+                canvasCtx.restore();
+
+                const canvas = chart.canvas;
+                
+                const handleMouseMove = (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const canvasX = e.clientX - rect.left;
+                    const canvasY = e.clientY - rect.top;
+
+                    let hoveredIdx = -1;
+                    const tolerance = 12;
+
+                    klines.forEach((kline, idx) => {
+                        const x = xScale.getPixelForValue(idx);
+                        if (Math.abs(canvasX - x) < tolerance && 
+                            canvasY > chartArea.top && canvasY < chartArea.bottom) {
+                            hoveredIdx = idx;
+                        }
+                    });
+
+                    if (hoveredIdx >= 0) {
+                        const kline = klines[hoveredIdx];
+                        const tooltipText = `${labels[hoveredIdx]}\nO $${formatPrice(kline.open)}\nH $${formatPrice(kline.high)}\nL $${formatPrice(kline.low)}\nC $${formatPrice(kline.close)}`;
+
+                        tooltipElement.textContent = tooltipText;
+                        tooltipElement.style.display = 'block';
+                        
+                        let tooltipX = e.clientX + 10;
+                        let tooltipY = e.clientY - 80;
+                        
+                        if (tooltipX + 150 > window.innerWidth) {
+                            tooltipX = e.clientX - 160;
+                        }
+                        
+                        tooltipElement.style.left = tooltipX + 'px';
+                        tooltipElement.style.top = tooltipY + 'px';
+                    } else {
+                        tooltipElement.style.display = 'none';
+                    }
+                };
+
+                const handleMouseLeave = () => {
+                    tooltipElement.style.display = 'none';
+                };
+
+                canvas.addEventListener('mousemove', handleMouseMove);
+                canvas.addEventListener('mouseleave', handleMouseLeave);
+            }
+        }]
     });
 
     ctx.style.height = '250px';
