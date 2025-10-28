@@ -56,11 +56,32 @@
             cursor: pointer;
             font-size: 20px;
             transition: all 0.2s;
-            box-shadow: 0 2px 8px rgba(51, 144, 236, 0.3);
+            box-shadow: 0 6px 16px rgba(51, 144, 236, 0.3),
+                        0 2px 4px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
+
+        .back-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            border-radius: 8px 8px 0 0;
         }
 
         .back-btn:active {
             transform: scale(0.95);
+            box-shadow: 0 3px 8px rgba(51, 144, 236, 0.2);
+        }
+
+        .back-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(51, 144, 236, 0.4),
+                        0 2px 8px rgba(0, 0, 0, 0.3);
         }
 
         .header h1 {
@@ -74,6 +95,21 @@
             padding: 24px;
             color: white;
             margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4), 
+                        0 2px 8px rgba(0, 0, 0, 0.3);
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .price-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+            border-radius: 16px 16px 0 0;
         }
 
         .price-header {
@@ -131,10 +167,26 @@
             border-radius: 16px;
             padding: 16px;
             margin-bottom: 20px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4),
+                        0 2px 8px rgba(0, 0, 0, 0.2),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            position: relative;
+        }
+
+        .chart-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            border-radius: 16px 16px 0 0;
         }
 
         .chart-container.light {
-            background: transparent;
+            background: #1a1a1a;
         }
 
         #priceChart {
@@ -160,6 +212,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-control:active {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .btn-timeframe {
@@ -184,12 +241,14 @@
             top: 100%;
             left: 0;
             background: var(--secondary);
-            border: 1px solid #4a474c;
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             z-index: 100;
             min-width: 120px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4),
+                        0 2px 8px rgba(0,0,0,0.2);
             margin-top: 4px;
+            backdrop-filter: blur(10px);
         }
 
         .timeframe-option {
@@ -233,12 +292,27 @@
         .btn-primary {
             background: var(--primary);
             color: white;
-            box-shadow: 0 4px 12px rgba(51, 144, 236, 0.3);
+            box-shadow: 0 8px 20px rgba(51, 144, 236, 0.4),
+                        0 2px 4px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
         }
 
         .btn-primary:active {
             opacity: 0.8;
             transform: scale(0.98);
+            box-shadow: 0 4px 10px rgba(51, 144, 236, 0.3);
         }
 
         .btn-primary:disabled {
@@ -282,7 +356,22 @@
             text-align: center;
             margin-bottom: 16px;
             color: white;
-            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.2);
+            box-shadow: 0 12px 32px rgba(16, 185, 129, 0.3),
+                        0 4px 8px rgba(0, 0, 0, 0.2),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            position: relative;
+        }
+
+        .prediction-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            border-radius: 16px 16px 0 0;
         }
 
         .signal-emoji {
@@ -345,9 +434,12 @@
         .confidence-section {
             margin: 16px 0;
             padding: 16px;
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.08);
             border-radius: 12px;
             backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         .confidence-label {
@@ -393,6 +485,29 @@
             background: var(--secondary);
             border-radius: 12px;
             padding: 16px;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3),
+                        0 1px 0 rgba(255, 255, 255, 0.05),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .indicator-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4),
+                        0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .indicator-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+            border-radius: 12px 12px 0 0;
         }
 
         .indicator-label {
@@ -530,7 +645,7 @@
             <div class="section-title">📊 Технический анализ</div>
             <div class="indicators-grid" id="predictionIndicators"></div>
 
-            <div class="chart-container light" style="margin-top: 20px;">
+            <div class="chart-container" style="margin-top: 20px;">
                 <canvas id="predictionChart"></canvas>
             </div>
         </div>
