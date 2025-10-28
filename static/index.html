@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Crypto Tracker - Bybit</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <title>Pulse Traders</title>
     <style>
         * {
             margin: 0;
@@ -27,10 +26,9 @@
             background: #ffffff;
             color: #000000;
             padding: 16px;
-            padding-bottom: 100px;
+            padding-bottom: 50px;
         }
 
-        /* ======================== HEADER ======================== */
         .header {
             text-align: center;
             margin-bottom: 24px;
@@ -47,7 +45,6 @@
             color: var(--text-secondary);
         }
 
-        /* ======================== ПОИСК ======================== */
         .search-container {
             position: relative;
             margin-bottom: 24px;
@@ -61,7 +58,6 @@
             font-size: 16px;
             background: #ffffff;
             color: var(--text);
-            transition: all 0.3s;
         }
 
         .search-input:focus {
@@ -123,7 +119,6 @@
             margin-top: 2px;
         }
 
-        /* ======================== СЕТКА КРИПТОВАЛЮТ ======================== */
         .section-title {
             font-size: 16px;
             font-weight: 600;
@@ -157,14 +152,9 @@
             transform: scale(0.95);
         }
 
-        .crypto-card.active {
+        .crypto-card:hover {
             border-color: var(--primary);
-            background: var(--primary);
-        }
-
-        .crypto-card.active .crypto-emoji,
-        .crypto-card.active .crypto-symbol {
-            color: white;
+            background: rgba(51, 144, 236, 0.1);
         }
 
         .crypto-emoji {
@@ -178,301 +168,6 @@
             transition: all 0.3s;
         }
 
-        /* ======================== ОСНОВНЫЕ КАРТОЧКИ ======================== */
-        .price-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 16px;
-            padding: 24px;
-            color: white;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .price-card.show {
-            display: block;
-        }
-
-        .price-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        .price-crypto-name {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .price-change {
-            padding: 4px 8px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .price-main {
-            font-size: 42px;
-            font-weight: bold;
-            margin: 16px 0;
-        }
-
-        .price-info {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            font-size: 12px;
-            opacity: 0.9;
-        }
-
-        .price-info-item {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .price-info-label {
-            opacity: 0.8;
-            font-size: 11px;
-        }
-
-        .price-info-value {
-            font-weight: 600;
-            font-size: 13px;
-        }
-
-        /* ======================== ГРАФИК ======================== */
-        .chart-container {
-            background: var(--secondary);
-            border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .chart-container.show {
-            display: block;
-        }
-
-        #priceChart {
-            max-height: 250px;
-        }
-
-        /* ======================== ИНДИКАТОРЫ ======================== */
-        .indicators-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .indicators-grid.show {
-            display: grid;
-        }
-
-        .indicator-card {
-            background: var(--secondary);
-            border-radius: 12px;
-            padding: 16px;
-        }
-
-        .indicator-label {
-            font-size: 11px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            margin-bottom: 6px;
-            font-weight: 600;
-        }
-
-        .indicator-value {
-            font-size: 22px;
-            font-weight: bold;
-            color: var(--primary);
-        }
-
-        /* ======================== ПРОГНОЗ ======================== */
-        .prediction-section {
-            display: none;
-            margin-bottom: 24px;
-        }
-
-        .prediction-section.show {
-            display: block;
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .prediction-card {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            border-radius: 16px;
-            padding: 24px;
-            text-align: center;
-            margin-bottom: 16px;
-            color: white;
-            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.2);
-        }
-
-        .signal-emoji {
-            font-size: 60px;
-            margin-bottom: 12px;
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-
-        .signal-text {
-            font-size: 20px;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-
-        .predicted-change {
-            font-size: 36px;
-            font-weight: bold;
-            margin-bottom: 16px;
-        }
-
-        .predicted-change.positive {
-            color: #d4fc79;
-        }
-
-        .predicted-change.negative {
-            color: #fca5a5;
-        }
-
-        .prediction-details {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin: 16px 0;
-            padding: 16px 0;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .detail-item {
-            text-align: center;
-        }
-
-        .detail-label {
-            font-size: 11px;
-            opacity: 0.9;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-
-        .detail-value {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .confidence-section {
-            margin: 16px 0;
-            padding: 16px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-        }
-
-        .confidence-label {
-            font-size: 11px;
-            opacity: 0.9;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-        }
-
-        .confidence-bar {
-            width: 100%;
-            height: 10px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 5px;
-            overflow: hidden;
-            margin-bottom: 8px;
-        }
-
-        .confidence-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #d4fc79, #fca5a5);
-            border-radius: 5px;
-            width: 0%;
-            transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        .confidence-value {
-            font-size: 16px;
-            font-weight: 600;
-        }
-
-        .metrics {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .metric-item {
-            text-align: center;
-        }
-
-        .metric-label {
-            font-size: 11px;
-            opacity: 0.9;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-
-        .metric-value {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        /* ======================== КНОПКИ ======================== */
-        .btn {
-            width: 100%;
-            padding: 14px 16px;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 12px;
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-            box-shadow: 0 4px 12px rgba(51, 144, 236, 0.3);
-        }
-
-        .btn-primary:active {
-            opacity: 0.8;
-            transform: scale(0.98);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* ======================== ЗАГРУЗКА ======================== */
         .loading {
             text-align: center;
             padding: 40px 20px;
@@ -502,34 +197,13 @@
         .loading-text {
             font-size: 14px;
         }
-
-        /* ======================== УТИЛИТЫ ======================== */
-        .hidden {
-            display: none !important;
-        }
-
-        .text-center {
-            text-align: center;
-        }
-
-        .text-muted {
-            color: var(--text-secondary);
-        }
-
-        .mt-16 {
-            margin-top: 16px;
-        }
-
-        .mb-16 {
-            margin-bottom: 16px;
-        }
     </style>
 </head>
 <body>
     <div id="app">
         <!-- HEADER -->
         <div class="header">
-            <h1>💰 Crypto Tracker</h1>
+            <h1>🔥 Pulse Traders 🔥</h1>
             <p>Анализ и прогнозы криптовалют</p>
         </div>
 
@@ -549,84 +223,6 @@
         <div class="section-title">Популярные</div>
         <div class="crypto-grid" id="cryptoGrid"></div>
 
-        <!-- ЦЕНА -->
-        <div class="price-card" id="priceCard">
-            <div class="price-header">
-                <div class="price-crypto-name" id="cryptoName"></div>
-                <div class="price-change" id="priceChange"></div>
-            </div>
-            <div class="price-main" id="currentPrice">$0.00</div>
-            <div class="price-info">
-                <div class="price-info-item">
-                    <div class="price-info-label">Макс (24ч)</div>
-                    <div class="price-info-value" id="high24h">$0.00</div>
-                </div>
-                <div class="price-info-item">
-                    <div class="price-info-label">Мин (24ч)</div>
-                    <div class="price-info-value" id="low24h">$0.00</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ГРАФИК -->
-        <div class="chart-container" id="chartContainer">
-            <canvas id="priceChart"></canvas>
-        </div>
-
-        <!-- КНОПКА ПРОГНОЗА -->
-        <button class="btn btn-primary hidden" id="predictBtn">
-            🔮 Прогноз на 7 дней
-        </button>
-
-        <!-- ПРОГНОЗ -->
-        <div class="prediction-section" id="predictionSection">
-            <div class="section-title">🔮 Прогноз</div>
-            <div class="prediction-card">
-                <div class="signal-emoji" id="signalEmoji"></div>
-                <div class="signal-text" id="signalText"></div>
-                <div class="predicted-change" id="predictedChange"></div>
-
-                <div class="prediction-details">
-                    <div class="detail-item">
-                        <div class="detail-label">Ожидаемая цена</div>
-                        <div class="detail-value" id="expectedPrice">$0.00</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Поддержка</div>
-                        <div class="detail-value" id="support">$0.00</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Сопротивление</div>
-                        <div class="detail-value" id="resistance">$0.00</div>
-                    </div>
-                </div>
-
-                <div class="confidence-section">
-                    <div class="confidence-label">Уверенность в прогнозе</div>
-                    <div class="confidence-bar">
-                        <div class="confidence-fill" id="confidenceFill"></div>
-                    </div>
-                    <div class="confidence-value" id="confidence">0%</div>
-                </div>
-
-                <div class="metrics">
-                    <div class="metric-item">
-                        <div class="metric-label">Погрешность (RMSE)</div>
-                        <div class="metric-value" id="rmse">--</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ИНДИКАТОРЫ НА ПРОГНОЗЕ -->
-            <div class="section-title">📊 Технический анализ</div>
-            <div class="indicators-grid" id="predictionIndicators"></div>
-
-            <!-- ГРАФИК ПРОГНОЗА -->
-            <div class="chart-container show">
-                <canvas id="predictionChart"></canvas>
-            </div>
-        </div>
-
         <!-- ЗАГРУЗКА -->
         <div class="loading" id="loading">
             <div class="spinner"></div>
@@ -634,6 +230,6 @@
         </div>
     </div>
 
-    <script src="/app.js"></script>
+    <script src="/app-home.js"></script>
 </body>
 </html>

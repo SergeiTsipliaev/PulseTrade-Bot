@@ -1,159 +1,37 @@
-// ======================== КОНФИГУРАЦИЯ ========================
 const API_URL = '/api';
-let selectedCrypto = null;
 let priceChart = null;
 let predictionChart = null;
-let searchTimeout = null;
 let currentCryptoData = null;
-
-// ======================== ИНИЦИАЛИЗАЦИЯ ========================
+let priceUpdateInterval = null;
+let selectedCrypto = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    await init();
+    // Получаем символ из URL параметров
+    const urlParams = new URLSearchParams(window.location.search);
+    const symbol = urlParams.get('symbol');
+
+    if (!symbol) {
+        window.location.href = '/';
+        return;
+    }
+
+    selectedCrypto = symbol;
+    await loadCryptoData(symbol);
+    setupEventListeners();
 });
 
-async function init() {
-    try {
-        await renderCryptoGrid();
-        setupEventListeners();
-        setupSearch();
-    } catch (error) {
-        console.error('Error:', error);
-        showError('Error loading app');
-    }
+function setupEventListeners() {
+    document.getElementById('predictBtn').onclick = makePrediction;
 }
-
-// ======================== ПОИСК ========================
-
-function setupSearch() {
-    const searchInput = document.getElementById('searchInput');
-    const searchResults = document.getElementById('searchResults');
-
-    searchInput.addEventListener('input', (e) => {
-        const query = e.target.value.trim();
-
-        if (searchTimeout) clearTimeout(searchTimeout);
-
-        if (query.length === 0) {
-            searchResults.classList.remove('show');
-            return;
-        }
-
-        searchResults.innerHTML = '<div class="search-result-item">🔍 Поиск...</div>';
-        searchResults.classList.add('show');
-
-        searchTimeout = setTimeout(() => {
-            performSearch(query);
-        }, 300);
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-            searchResults.classList.remove('show');
-        }
-    });
-}
-
-async function performSearch(query) {
-    if (query.length < 1) return;
-
-    const searchResults = document.getElementById('searchResults');
-
-    try {
-        const response = await fetch(`${API_URL}/search?q=${encodeURIComponent(query)}`);
-        const data = await response.json();
-
-        if (data.success && data.data.length > 0) {
-            displaySearchResults(data.data);
-        } else {
-            searchResults.innerHTML = '<div class="search-result-item">Не найдено</div>';
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        searchResults.innerHTML = '<div class="search-result-item">Ошибка поиска</div>';
-    }
-}
-
-function displaySearchResults(results) {
-    const searchResults = document.getElementById('searchResults');
-
-    searchResults.innerHTML = results.map(crypto => `
-        <div class="search-result-item" onclick="selectCryptoFromSearch('${crypto.symbol}')">
-            <div class="search-result-info">
-                <div class="search-result-symbol">${crypto.symbol}</div>
-                <div class="search-result-name">${crypto.name}</div>
-            </div>
-        </div>
-    `).join('');
-}
-
-async function selectCryptoFromSearch(symbol) {
-    selectedCrypto = symbol;
-    document.getElementById('searchResults').classList.remove('show');
-    document.getElementById('searchInput').value = '';
-
-    showLoading('Загрузка...');
-    hidePrediction();
-    await loadCryptoData(symbol);
-}
-
-// ======================== СЕТКА КРИПТОВАЛЮТ ========================
-
-async function renderCryptoGrid() {
-    const grid = document.getElementById('cryptoGrid');
-    grid.innerHTML = '';
-
-    try {
-        const response = await fetch(`${API_URL}/cryptos/all`);
-        const data = await response.json();
-
-        if (data.success) {
-            const cryptos = data.data.slice(0, 6);
-
-            cryptos.forEach(crypto => {
-                const card = document.createElement('div');
-                card.className = 'crypto-card';
-                card.onclick = () => {
-                    selectedCrypto = crypto.symbol;
-                    updateCryptoGrid();
-                    showLoading('Загрузка...');
-                    hidePrediction();
-                    loadCryptoData(crypto.symbol);
-                };
-
-                card.innerHTML = `
-                    <div class="crypto-emoji">${crypto.emoji || '💰'}</div>
-                    <div class="crypto-symbol">${crypto.display_name || crypto.symbol}</div>
-                `;
-
-                grid.appendChild(card);
-            });
-        }
-    } catch (error) {
-        console.error('Error:', error);
-    }
-}
-
-function updateCryptoGrid() {
-    document.querySelectorAll('.crypto-card').forEach((card, index) => {
-        card.classList.remove('active');
-    });
-
-    if (selectedCrypto) {
-        document.querySelectorAll('.crypto-card').forEach(card => {
-            const symbol = card.querySelector('.crypto-symbol').textContent;
-            if (selectedCrypto.includes(symbol)) {
-                card.classList.add('active');
-            }
-        });
-    }
-}
-
-// ======================== ЗАГРУЗКА ДАННЫХ ========================
 
 async function loadCryptoData(symbol) {
-    selectedCrypto = symbol;
-    updateCryptoGrid();
+    // Останавливаем предыдущее обновление
+    if (priceUpdateInterval) {
+        clearInterval(priceUpdateInterval);
+        priceUpdateInterval = null;
+    }
+
+    showLoading('Загрузка...');
 
     try {
         const response = await fetch(`${API_URL}/crypto/${symbol}`);
@@ -162,23 +40,75 @@ async function loadCryptoData(symbol) {
         if (data.success) {
             currentCryptoData = data.data;
             displayCryptoData(data.data);
-            document.getElementById('predictBtn').classList.remove('hidden');
+
+            // Запустить реалтайм обновление каждые 10 секунд
+            priceUpdateInterval = setInterval(() => {
+                updatePriceRealtime(symbol);
+            }, 10000);
         } else {
-            showError('Ошибка: ' + (data.error || 'Unknown error'));
+            alert('Ошибка: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
         console.error('Error:', error);
-        showError('Ошибка подключения');
+        alert('Ошибка подключения');
     } finally {
         hideLoading();
     }
 }
 
-function displayCryptoData(data) {
-    const priceCard = document.getElementById('priceCard');
-    priceCard.classList.add('show');
+async function updatePriceRealtime(symbol) {
+    try {
+        const response = await fetch(`${API_URL}/crypto/${symbol}`);
+        const data = await response.json();
 
-    document.getElementById('cryptoName').textContent = data.symbol;
+        if (data.success && data.data) {
+            const newData = data.data;
+
+            // Обновляем цену
+            const currentPrice = newData.current.price;
+            document.getElementById('currentPrice').textContent = `$${formatPrice(currentPrice)}`;
+
+            // Обновляем изменение
+            const change = newData.current.change_24h || 0;
+            const changeEl = document.getElementById('priceChange');
+            const changeIcon = change >= 0 ? '↑' : '↓';
+            const changeColor = change >= 0 ? '#10b981' : '#ef4444';
+
+            changeEl.textContent = `${changeIcon} ${Math.abs(change).toFixed(2)}%`;
+            changeEl.style.color = changeColor;
+            changeEl.style.background = changeColor + '20';
+
+            // Обновляем high/low
+            document.getElementById('high24h').textContent = `$${formatPrice(newData.current.high_24h)}`;
+            document.getElementById('low24h').textContent = `$${formatPrice(newData.current.low_24h)}`;
+
+            // Обновляем график
+            if (priceChart && newData.history && newData.history.prices) {
+                const newPrices = newData.history.prices;
+                const newTimestamps = newData.history.timestamps;
+
+                const maxPoints = 90;
+                const startIdx = Math.max(0, newPrices.length - maxPoints);
+
+                priceChart.data.datasets[0].data = newPrices.slice(startIdx);
+                priceChart.data.labels = newTimestamps.slice(startIdx).map(ts => {
+                    const date = new Date(ts);
+                    return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                });
+
+                priceChart.update('none');
+            }
+
+            currentCryptoData = newData;
+        }
+    } catch (error) {
+        console.error('Error updating price:', error);
+    }
+}
+
+function displayCryptoData(data) {
+    document.getElementById('cryptoName').textContent = data.symbol.slice(0, -4); // Убираем USDT
+    document.getElementById('cryptoSymbol').textContent = data.symbol;
 
     const currentPrice = data.current.price;
     document.getElementById('currentPrice').textContent = `$${formatPrice(currentPrice)}`;
@@ -198,12 +128,7 @@ function displayCryptoData(data) {
     displayPriceChart(data.history);
 }
 
-// ======================== ГРАФИК ЦЕНЫ ========================
-
 function displayPriceChart(history) {
-    const container = document.getElementById('chartContainer');
-    container.classList.add('show');
-
     const ctx = document.getElementById('priceChart');
 
     if (priceChart) {
@@ -256,9 +181,7 @@ function displayPriceChart(history) {
                     titleFont: { size: 13, weight: 'bold' },
                     bodyFont: { size: 12 },
                     callbacks: {
-                        label: (context) => {
-                            return `  Цена: $${formatPrice(context.parsed.y)}`;
-                        }
+                        label: (context) => `  Цена: $${formatPrice(context.parsed.y)}`
                     }
                 }
             },
@@ -291,13 +214,8 @@ function displayPriceChart(history) {
     ctx.style.height = '250px';
 }
 
-// ======================== ПРОГНОЗ ========================
-
 async function makePrediction() {
-    if (!selectedCrypto) {
-        showError('Сначала выберите криптовалюту');
-        return;
-    }
+    if (!selectedCrypto) return;
 
     const btn = document.getElementById('predictBtn');
     btn.disabled = true;
@@ -316,11 +234,11 @@ async function makePrediction() {
         if (data.success) {
             displayPrediction(data.data);
         } else {
-            showError('Ошибка: ' + (data.error || 'Unknown error'));
+            alert('Ошибка: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
         console.error('Error:', error);
-        showError('Ошибка подключения');
+        alert('Ошибка подключения');
     } finally {
         hideLoading();
         btn.disabled = false;
@@ -394,12 +312,12 @@ function displayPredictionIndicators(indicators) {
         {
             label: 'Волатильность',
             value: `${indicators.volatility.toFixed(2)}%`,
-            color: indicators.volatility > 5 ? '#ef4444' : '#10b981'
+            color: indicators.volatility > 5 ? '#ef4444' : '#57d231ff'
         },
         {
             label: 'Тренд',
             value: `${indicators.trend_strength > 0 ? '+' : ''}${indicators.trend_strength.toFixed(1)}%`,
-            color: indicators.trend_strength > 0 ? '#10b981' : '#ef4444'
+            color: indicators.trend_strength > 0 ? '#20be28ff' : '#e43939e8'
         }
     ];
 
@@ -408,7 +326,7 @@ function displayPredictionIndicators(indicators) {
         card.className = 'indicator-card';
         card.innerHTML = `
             <div class="indicator-label">${item.label}</div>
-            <div class="indicator-value" style="color: ${item.color || '#3390ec'}">${item.value}</div>
+            <div class="indicator-value" style="color: ${item.color || '#2f87dfff'}">${item.value}</div>
         `;
         grid.appendChild(card);
     });
@@ -428,10 +346,8 @@ function displayPredictionChart(prediction) {
     }
 
     const labels = Array.from({ length: prediction.days }, (_, i) => `День ${i + 1}`);
-
-    // Определяем цвет в зависимости от тренда
-    const trendColor = prediction.predicted_change > 0 ? '#60D102' : '#E1221D';
-    const bgColor = prediction.predicted_change > 0 ? 'rgba(6, 182, 212, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+    const trendColor = prediction.predicted_change > 0 ? '#6cc033ae' : '#dc2828ff';
+    const bgColor = prediction.predicted_change > 0 ? 'rgba(171, 238, 130, 0.15)' : 'rgba(239, 68, 68, 0.15)';
 
     predictionChart = new Chart(ctx, {
         type: 'line',
@@ -479,8 +395,7 @@ function displayPredictionChart(prediction) {
                     labels: {
                         padding: 15,
                         font: { size: 12, weight: '600' },
-                        usePointStyle: true,
-                        pointStyle: 'circle'
+                        usePointStyle: true
                     }
                 },
                 tooltip: {
@@ -545,24 +460,6 @@ function displayPredictionChart(prediction) {
     ctx.style.height = '350px';
 }
 
-function hidePrediction() {
-    const section = document.getElementById('predictionSection');
-    section.classList.remove('show');
-
-    if (predictionChart) {
-        predictionChart.destroy();
-        predictionChart = null;
-    }
-}
-
-// ======================== ОБРАБОТЧИКИ ========================
-
-function setupEventListeners() {
-    document.getElementById('predictBtn').onclick = makePrediction;
-}
-
-// ======================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ========================
-
 function showLoading(text = 'Загрузка...') {
     const loading = document.getElementById('loading');
     document.getElementById('loadingText').textContent = text;
@@ -571,10 +468,6 @@ function showLoading(text = 'Загрузка...') {
 
 function hideLoading() {
     document.getElementById('loading').classList.remove('show');
-}
-
-function showError(message) {
-    alert(message);
 }
 
 function formatPrice(price) {
