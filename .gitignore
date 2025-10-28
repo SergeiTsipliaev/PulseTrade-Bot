@@ -238,3 +238,4 @@ models/*.h5
 .DS_Store
 Thumbs.db
 .env
+secret_key.py
