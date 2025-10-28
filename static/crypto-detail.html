@@ -390,6 +390,69 @@
 
         <!-- ГРАФИК -->
         <div class="chart-container">
+            <!-- Таймфреймы -->
+            <div style="margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap;">
+                <div style="position: relative;">
+                    <button id="timeframeBtn" style="
+                        background: var(--primary);
+                        color: white;
+                        border: none;
+                        padding: 8px 12px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        font-size: 13px;
+                    ">1h ▼</button>
+                    
+                    <div id="timeframeMenu" style="
+                        display: none;
+                        position: absolute;
+                        top: 100%;
+                        left: 0;
+                        background: white;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        z-index: 100;
+                        min-width: 120px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                        margin-top: 4px;
+                    ">
+                        <div class="timeframe-option" data-interval="1">1m</div>
+                        <div class="timeframe-option" data-interval="5">5m</div>
+                        <div class="timeframe-option" data-interval="15">15m</div>
+                        <div class="timeframe-option" data-interval="30">30m</div>
+                        <div class="timeframe-option" data-interval="60">1h</div>
+                        <div class="timeframe-option" data-interval="240">4h</div>
+                        <div class="timeframe-option" data-interval="720">12h</div>
+                        <div class="timeframe-option" data-interval="D">1d</div>
+                        <div class="timeframe-option" data-interval="W">1w</div>
+                    </div>
+                </div>
+            </div>
+
+            <style>
+                .timeframe-option {
+                    padding: 10px 16px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    font-size: 13px;
+                    font-weight: 500;
+                }
+                
+                .timeframe-option:hover {
+                    background: var(--secondary);
+                    color: var(--primary);
+                }
+                
+                .timeframe-option:first-child {
+                    border-radius: 8px 8px 0 0;
+                }
+                
+                .timeframe-option:last-child {
+                    border-radius: 0 0 8px 8px;
+                }
+            </style>
+
             <canvas id="priceChart"></canvas>
         </div>
 

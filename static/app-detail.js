@@ -4,6 +4,7 @@ let predictionChart = null;
 let currentCryptoData = null;
 let priceUpdateInterval = null;
 let selectedCrypto = null;
+let currentTimeframe = '60'; // Текущий таймфрейм (по умолчанию 1h)
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Получаем символ из URL параметров
@@ -18,7 +19,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     selectedCrypto = symbol;
     await loadCryptoData(symbol);
     setupEventListeners();
+    setupTimeframeMenu();
 });
+
+function setupTimeframeMenu() {
+    const btn = document.getElementById('timeframeBtn');
+    const menu = document.getElementById('timeframeMenu');
+    const options = document.querySelectorAll('.timeframe-option');
+
+    // Открыть/закрыть меню
+    btn.onclick = (e) => {
+        e.stopPropagation();
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    };
+
+    // Выбор таймфрейма
+    options.forEach(option => {
+        option.onclick = () => {
+            const interval = option.dataset.interval;
+            const label = option.textContent;
+            
+            currentTimeframe = interval;
+            btn.textContent = `${label} ▼`;
+            menu.style.display = 'none';
+            
+            // Загружаем новые свечи
+            loadKlines(selectedCrypto, interval);
+        };
+    });
+
+    // Закрыть меню при клике вне его
+    document.addEventListener('click', (e) => {
+        if (!btn.contains(e.target) && !menu.contains(e.target)) {
+            menu.style.display = 'none';
+        }
+    });
+}
 
 function setupEventListeners() {
     document.getElementById('predictBtn').onclick = makePrediction;
@@ -125,7 +161,8 @@ function displayCryptoData(data) {
     document.getElementById('high24h').textContent = `$${formatPrice(data.current.high_24h)}`;
     document.getElementById('low24h').textContent = `$${formatPrice(data.current.low_24h)}`;
 
-    displayPriceChart(data.history);
+    // Загружаем klines вместо истории цен
+    loadKlines(data.symbol, currentTimeframe);
 }
 
 function displayPriceChart(history) {
@@ -182,6 +219,121 @@ function displayPriceChart(history) {
                     bodyFont: { size: 12 },
                     callbacks: {
                         label: (context) => `  Цена: $${formatPrice(context.parsed.y)}`
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    grid: {
+                        color: 'rgba(0,0,0,0.05)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        callback: (value) => `$${formatNumber(value)}`,
+                        font: { size: 11 }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false,
+                        drawBorder: false
+                    },
+                    ticks: {
+                        maxTicksLimit: 8,
+                        font: { size: 11 }
+                    }
+                }
+            }
+        }
+    });
+
+    ctx.style.height = '250px';
+}
+
+// Загрузить свечи (klines) с API
+async function loadKlines(symbol, interval) {
+    try {
+        const response = await fetch(`${API_URL}/klines/${symbol}?interval=${interval}&limit=200`);
+        const data = await response.json();
+
+        if (data.success && data.data && data.data.length > 0) {
+            displayPriceChartFromKlines(data.data, interval);
+        } else {
+            console.error('No klines data');
+        }
+    } catch (error) {
+        console.error('Error loading klines:', error);
+    }
+}
+
+// Отобразить график на основе klines
+function displayPriceChartFromKlines(klines, interval) {
+    const ctx = document.getElementById('priceChart');
+
+    if (priceChart) {
+        priceChart.destroy();
+    }
+
+    // Форматируем временные метки в зависимости от таймфрейма
+    const labels = klines.map(kline => {
+        const date = new Date(kline.timestamp);
+        
+        if (['D', 'W', 'M'].includes(interval)) {
+            return date.toLocaleDateString('ru-RU');
+        } else {
+            return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
+    });
+
+    const closePrices = klines.map(k => k.close);
+
+    priceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Цена (USDT)',
+                data: closePrices,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                borderWidth: 2.5,
+                pointBackgroundColor: '#667eea',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        padding: 15,
+                        font: { size: 12, weight: '600' },
+                        usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    padding: 12,
+                    cornerRadius: 8,
+                    titleFont: { size: 13, weight: 'bold' },
+                    bodyFont: { size: 12 },
+                    callbacks: {
+                        label: (context) => `  Цена: $${formatPrice(context.parsed.y)}`,
+                        afterLabel: (context) => {
+                            const kline = klines[context.dataIndex];
+                            return `  Open: $${formatPrice(kline.open)}\n  High: $${formatPrice(kline.high)}\n  Low: $${formatPrice(kline.low)}`;
+                        }
                     }
                 }
             },
@@ -312,12 +464,12 @@ function displayPredictionIndicators(indicators) {
         {
             label: 'Волатильность',
             value: `${indicators.volatility.toFixed(2)}%`,
-            color: indicators.volatility > 5 ? '#ef4444' : '#57d231ff'
+            color: indicators.volatility > 5 ? '#ef4444' : '#10b981'
         },
         {
             label: 'Тренд',
             value: `${indicators.trend_strength > 0 ? '+' : ''}${indicators.trend_strength.toFixed(1)}%`,
-            color: indicators.trend_strength > 0 ? '#20be28ff' : '#e43939e8'
+            color: indicators.trend_strength > 0 ? '#10b981' : '#ef4444'
         }
     ];
 
@@ -326,7 +478,7 @@ function displayPredictionIndicators(indicators) {
         card.className = 'indicator-card';
         card.innerHTML = `
             <div class="indicator-label">${item.label}</div>
-            <div class="indicator-value" style="color: ${item.color || '#2f87dfff'}">${item.value}</div>
+            <div class="indicator-value" style="color: ${item.color || '#3390ec'}">${item.value}</div>
         `;
         grid.appendChild(card);
     });
@@ -346,8 +498,8 @@ function displayPredictionChart(prediction) {
     }
 
     const labels = Array.from({ length: prediction.days }, (_, i) => `День ${i + 1}`);
-    const trendColor = prediction.predicted_change > 0 ? '#6cc033ae' : '#dc2828ff';
-    const bgColor = prediction.predicted_change > 0 ? 'rgba(171, 238, 130, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+    const trendColor = prediction.predicted_change > 0 ? '#06b6d4' : '#ef4444';
+    const bgColor = prediction.predicted_change > 0 ? 'rgba(6, 182, 212, 0.15)' : 'rgba(239, 68, 68, 0.15)';
 
     predictionChart = new Chart(ctx, {
         type: 'line',
