@@ -17,15 +17,15 @@
             --success: #10b981;
             --danger: #ef4444;
             --warning: #f59e0b;
-            --secondary: #f0f0f0;
-            --text: #000000;
-            --text-secondary: #999;
+            --secondary: #3d3a3f;
+            --text: #ffffff;
+            --text-secondary: #b0adb5;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
-            color: #000000;
+            background: #29262A;
+            color: #ffffff;
             padding: 16px;
             padding-bottom: 100px;
         }
@@ -44,7 +44,7 @@
         }
 
         .back-btn {
-            background: var(--primary);
+            background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%);
             color: white;
             border: none;
             border-radius: 8px;
@@ -133,6 +133,10 @@
             margin-bottom: 20px;
         }
 
+        .chart-container.light {
+            background: transparent;
+        }
+
         #priceChart {
             filter: invert(0);
         }
@@ -179,12 +183,12 @@
             position: absolute;
             top: 100%;
             left: 0;
-            background: white;
-            border: 1px solid #ddd;
+            background: var(--secondary);
+            border: 1px solid #4a474c;
             border-radius: 8px;
             z-index: 100;
             min-width: 120px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             margin-top: 4px;
         }
 
@@ -194,11 +198,11 @@
             transition: all 0.2s;
             font-size: 13px;
             font-weight: 500;
-            color: #000000;
+            color: var(--text);
         }
         
         .timeframe-option:hover {
-            background: #f0f0f0;
+            background: #4a474c;
             color: var(--primary);
         }
         
@@ -526,7 +530,7 @@
             <div class="section-title">📊 Технический анализ</div>
             <div class="indicators-grid" id="predictionIndicators"></div>
 
-            <div class="chart-container" style="margin-top: 20px;">
+            <div class="chart-container light" style="margin-top: 20px;">
                 <canvas id="predictionChart"></canvas>
             </div>
         </div>

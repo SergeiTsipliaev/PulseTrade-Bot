@@ -217,7 +217,8 @@ function displayLineChart(klines, interval, ctx) {
                     labels: {
                         padding: 15,
                         font: { size: 12, weight: '600' },
-                        usePointStyle: true
+                        usePointStyle: true,
+                        color: '#ffffff'
                     }
                 },
                 tooltip: {
@@ -237,12 +238,13 @@ function displayLineChart(klines, interval, ctx) {
                 y: {
                     beginAtZero: false,
                     grid: {
-                        color: 'rgba(0,0,0,0.05)',
+                        color: 'rgba(255,255,255,0.1)',
                         drawBorder: false
                     },
                     ticks: {
                         callback: (value) => `$${formatNumber(value)}`,
-                        font: { size: 11 }
+                        font: { size: 11 },
+                        color: '#ffffff'
                     }
                 },
                 x: {
@@ -252,7 +254,8 @@ function displayLineChart(klines, interval, ctx) {
                     },
                     ticks: {
                         maxTicksLimit: 8,
-                        font: { size: 11 }
+                        font: { size: 11 },
+                        color: '#ffffff'
                     }
                 }
             }
@@ -328,12 +331,13 @@ function displayCandlestickChart(klines, interval, ctx) {
                 y: {
                     beginAtZero: false,
                     grid: {
-                        color: 'rgba(0,0,0,0.05)',
+                        color: 'rgba(255,255,255,0.1)',
                         drawBorder: false
                     },
                     ticks: {
                         callback: (value) => `$${formatNumber(value)}`,
-                        font: { size: 11 }
+                        font: { size: 11 },
+                        color: '#ffffff'
                     }
                 },
                 x: {
@@ -343,7 +347,8 @@ function displayCandlestickChart(klines, interval, ctx) {
                     },
                     ticks: {
                         maxTicksLimit: 8,
-                        font: { size: 11 }
+                        font: { size: 11 },
+                        color: '#ffffff'
                     }
                 }
             }
@@ -368,7 +373,7 @@ function displayCandlestickChart(klines, interval, ctx) {
                     const color = isGreen ? '#10b981' : '#ef4444';
                     const bodyTop = Math.min(openY, closeY);
                     const bodyHeight = Math.abs(closeY - openY) || 3;
-                    const bodyWidth = 16;
+                    const bodyWidth = 8;
 
                     // Wick (тень/фитиль)
                     canvasCtx.strokeStyle = color;
@@ -621,7 +626,8 @@ function displayPredictionChart(prediction) {
                     labels: {
                         padding: 15,
                         font: { size: 12, weight: '600' },
-                        usePointStyle: true
+                        usePointStyle: true,
+                        color: '#ffffff'
                     }
                 },
                 tooltip: {
@@ -662,12 +668,13 @@ function displayPredictionChart(prediction) {
                 y: {
                     beginAtZero: false,
                     grid: {
-                        color: 'rgba(0,0,0,0.05)',
+                        color: 'rgba(255,255,255,0.1)',
                         drawBorder: false
                     },
                     ticks: {
                         callback: (value) => `$${formatNumber(value)}`,
-                        font: { size: 11 }
+                        font: { size: 11 },
+                        color: '#ffffff'
                     }
                 },
                 x: {
@@ -676,7 +683,8 @@ function displayPredictionChart(prediction) {
                         drawBorder: false
                     },
                     ticks: {
-                        font: { size: 11 }
+                        font: { size: 11 },
+                        color: '#ffffff'
                     }
                 }
             }
